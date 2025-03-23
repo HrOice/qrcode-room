@@ -2,7 +2,7 @@
 import * as AdminUserService from '@/lib/service/AdminUserService'
 import { NextRequest, NextResponse } from 'next/server'
 
-export class UserController {
+class UserController {
 
     static async POST(req: NextRequest): Promise<NextResponse> {
         const { username, password } = await req.json()

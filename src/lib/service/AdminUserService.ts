@@ -4,7 +4,7 @@ import { jwtUtils } from "../utils/jwtUtils";
 
 // admin登录
 export async function AdminLogin(username: string, password: string) {
-    const user = await prisma.User.findFirst({
+    const user = await prisma.user.findFirst({
         where: {
             username,
             password,
@@ -50,13 +50,9 @@ export async function GetUserList(page: number, keyword: string) {
     return users;
 }
 
-async function isSuperAdmin() {
-
-}
-
 // 添加用户
 export async function AddUser(username: string, password: string) {
-    const user = await prisma.User.create({
+    const user = await prisma.user.create({
         data: {
             username,
             password,
@@ -71,7 +67,7 @@ export async function UpdateStatus(id: number, status: number) {
     if (id == 1) {
         throw new Error('超级管理员不允许修改状态');
     }
-    const user = await prisma.User.update({
+    const user = await prisma.user.update({
         where: {
             id,
         },

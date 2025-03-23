@@ -2,16 +2,13 @@
 
 import { cdkeyApi, type CDKey } from '@/lib/api/cdkey'
 import { copyToClipboard } from '@/lib/utils/clipboard'
-import { debounce } from '@/lib/utils/debounce'
 import { Search } from '@react-vant/icons'
 import { format } from 'date-fns'
-import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Button, Cell, Input, Pagination, Popup } from 'react-vant'
 
 export default function CDKeyPage() {
-    const router = useRouter()
     const [cdkeys, setCDKeys] = useState<CDKey[]>([])
     const [keyword, setKeyword] = useState('')
     const [status, setStatus] = useState<number>()
@@ -38,17 +35,13 @@ export default function CDKeyPage() {
             setCDKeys(cdkeys)
             setTotalItems(total)
         } catch (error) {
+            console.log(error)
             toast.error('加载失败')
         } finally {
             setLoading(false)
         }
     }, [currentPage, keyword, status, totalUse])
 
-    // 使用 useMemo 创建防抖的 fetchCDKeys
-    const debouncedFetch = useMemo(
-        () => debounce(fetchCDKeys, 300),
-        [fetchCDKeys]
-    )
 
     // 搜索处理
     const handleSearch = () => {
@@ -68,10 +61,10 @@ export default function CDKeyPage() {
         fetchCDKeys()
     }, [fetchCDKeys])
 
-    async function toggleStatus(id: number, status: number): void {
-        await cdkeyApi.updateStatus(id, !status)
-        await fetchCDKeys()
-    }
+    // async function toggleStatus(id: number, status: number): void {
+    //     await cdkeyApi.updateStatus(id, !status)
+    //     await fetchCDKeys()
+    // }
 
     return (
         <div className="space-y-4">
@@ -84,9 +77,9 @@ export default function CDKeyPage() {
                     prefix={<Search />}
                     className="!w-64"
                 />
-                <Button onClick={() => setShowStatusPicker(true)}>
-                    状态: {status === undefined ? '全部' : status ? '可用' : '禁用'}
-                </Button>
+                {/*<Button onClick={() => setShowStatusPicker(true)}>*/}
+                {/*    状态: {status === undefined ? '全部' : status ? '可用' : '禁用'}*/}
+                {/*</Button>*/}
                 <Input
                     value={totalUse === undefined ? '' : String(totalUse)}
                     onChange={(val) => {
@@ -94,7 +87,7 @@ export default function CDKeyPage() {
                         setTotalUse(num && !isNaN(num) ? num : undefined)
                     }}
                     type="number"
-                    min={1}
+                    // min={1}
                     placeholder="使用次数"
                     className="!w-32"
                 />
@@ -109,7 +102,7 @@ export default function CDKeyPage() {
                 <div className="grid lg:grid-cols-5 grid-cols-1 gap-4 px-4 py-3 bg-gray-50 text-gray-600 font-medium text-sm">
                     <div>CDKey</div>
                     <div className="lg:block hidden">使用次数</div>
-                    <div className="lg:block hidden">状态</div>
+                    {/*<div className="lg:block hidden">状态</div>*/}
                     <div className="lg:block hidden">创建时间</div>
                     <div className="lg:block hidden">操作</div>
                 </div>
@@ -142,16 +135,16 @@ export default function CDKeyPage() {
                                 {/* 在小屏幕下显示的信息 */}
                                 <div className="lg:hidden w-full grid grid-cols-2 gap-2 text-sm text-gray-600">
                                     <div>使用次数: {cdkey.used}/{cdkey.total}</div>
-                                    <div>
-                                        状态: 
-                                        <span className={`ml-1 px-2 py-1 rounded ${
-                                            cdkey.status 
-                                                ? 'bg-green-50 text-green-600' 
-                                                : 'bg-red-50 text-red-600'
-                                        }`}>
-                                            {cdkey.status ? '可用' : '禁用'}
-                                        </span>
-                                    </div>
+                                    {/*<div>*/}
+                                    {/*    状态: */}
+                                    {/*    <span className={`ml-1 px-2 py-1 rounded ${*/}
+                                    {/*        cdkey.status */}
+                                    {/*            ? 'bg-green-50 text-green-600' */}
+                                    {/*            : 'bg-red-50 text-red-600'*/}
+                                    {/*    }`}>*/}
+                                    {/*        {cdkey.status ? '可用' : '禁用'}*/}
+                                    {/*    </span>*/}
+                                    {/*</div>*/}
                                     <div>创建时间: {format(new Date(cdkey.createdAt), 'yyyy-MM-dd HH:mm')}</div>
                                 </div>
 
@@ -173,23 +166,23 @@ export default function CDKeyPage() {
                                 </div>
                                 
                                 {/* 操作按钮 */}
-                                <div className="w-full lg:w-auto flex lg:flex-col gap-2">
-                                    <Button
-                                        size="mini"
-                                        type={cdkey.status ? 'danger' : 'primary'}
-                                        onClick={() => toggleStatus(cdkey.id, cdkey.status)}
-                                        className="flex-1 lg:flex-none"
-                                    >
-                                        {cdkey.status ? '禁用' : '启用'}
-                                    </Button>
-                                    <Button
-                                        size="mini"
-                                        onClick={() => router.push(`/admin/cdkey/records/${cdkey.id}`)}
-                                        className="flex-1 lg:flex-none"
-                                    >
-                                        记录
-                                    </Button>
-                                </div>
+                                {/*<div className="w-full lg:w-auto flex lg:flex-col gap-2">*/}
+                                {/*    <Button*/}
+                                {/*        size="mini"*/}
+                                {/*        type={cdkey.status ? 'danger' : 'primary'}*/}
+                                {/*        onClick={() => toggleStatus(cdkey.id, cdkey.status)}*/}
+                                {/*        className="flex-1 lg:flex-none"*/}
+                                {/*    >*/}
+                                {/*        {cdkey.status ? '禁用' : '启用'}*/}
+                                {/*    </Button>*/}
+                                {/*    <Button*/}
+                                {/*        size="mini"*/}
+                                {/*        onClick={() => router.push(`/admin/cdkey/records/${cdkey.id}`)}*/}
+                                {/*        className="flex-1 lg:flex-none"*/}
+                                {/*    >*/}
+                                {/*        记录*/}
+                                {/*    </Button>*/}
+                                {/*</div>*/}
                             </div>
                         </Cell>
                     ))}
@@ -273,7 +266,7 @@ export default function CDKeyPage() {
                                     number: isNaN(num) ? 1 : Math.max(1, num)
                                 }))
                             }}
-                            min={1}
+                            // min={1}
                         />
                     </div>
 
@@ -289,7 +282,7 @@ export default function CDKeyPage() {
                                     totalUse: isNaN(num) ? 1 : Math.max(1, num)
                                 }))
                             }}
-                            min={1}
+                            // min={1}
                         />
                     </div>
 
@@ -310,6 +303,7 @@ export default function CDKeyPage() {
                                     setShowAddDialog(false)
                                     fetchCDKeys()
                                 } catch (error) {
+                                    console.error(error)
                                     toast.error('创建失败')
                                 }
                             }}

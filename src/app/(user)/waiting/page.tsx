@@ -2,10 +2,11 @@
 
 import { RoomSocket } from '@/lib/socket/client'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, Suspense } from 'react'
 import { Button, Image } from 'react-vant'
 
-export default function WaitingPage() {
+// 创建一个包装组件来处理搜索参数
+function WaitingContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const [socket, setSocket] = useState<RoomSocket | null>(null)
@@ -15,7 +16,15 @@ export default function WaitingPage() {
     const [adminReady, setAdminReady] = useState(false)
     const [roomId, setRoomId] = useState(0);
     const [ready, setReady] = useState(false) // 添加用户准备状态
+    const readyRef = useRef(false)  // 添加 ref 来跟踪最新状态
     const [imgSrc, setImgsrc] = useState('')
+    const [usedCount, setUsedCount] = useState(0)
+    const [totalCount, setTotalCount] = useState(0)
+
+    useEffect(() => {
+        readyRef.current = ready  // 当 ready 状态改变时更新 ref
+    }, [ready])
+
 
     useEffect(() => {
         const key = searchParams.get('key')
@@ -34,10 +43,27 @@ export default function WaitingPage() {
             setAdminReady(ready)
         }, () => {
             setAdminJoin(false)
-        }, (id) => {
+            setAdminReady(false)
+            setReady(false)
+        }, (id, ready, online, used, total) => {
             setRoomId(id)
-        }, (data) => {
+            setAdminJoin(online)
+            setAdminReady(ready)
+            setTotalCount(total)
+            setUsedCount(used)
+        }, (data, used) => {
             setImgsrc(data)
+            setUsedCount(used)
+        }, () => {
+            const currentReady = readyRef.current;  // 记录当前状态以便调试
+            console.log('Status check, current ready state:', currentReady);
+            return {
+                ready: currentReady,
+            }
+        }, (param) => {
+            const {online, ready} = param
+            setAdminJoin(online)
+            setAdminReady(ready)
         })
         setSocket(roomSocket)
 
@@ -51,8 +77,17 @@ export default function WaitingPage() {
         if (!socket) return
         const r = !ready;
         socket.userReady(r, (re) => {
+            console.log('user ready', ready, re)
             setReady(re)
+            console.log('user ready1', ready, re)
+
         })
+    }
+
+    const handleLeave = () => {
+        if (!socket) return
+        socket.clientLeaveRoom()
+        router.replace("/login")
     }
 
     return (
@@ -68,6 +103,12 @@ export default function WaitingPage() {
                     <div className="font-mono bg-gray-50 p-2 rounded">
                         {searchParams.get('key')}
                     </div>
+                    <div className="text-sm text-gray-500 flex justify-between items-center">
+                    <span>使用次数:</span>
+                    <span className={usedCount >= totalCount ? 'text-red-500' : 'text-green-500'}>
+                        {usedCount}/{totalCount}
+                    </span>
+                </div>
                 </div>
             </div>
 
@@ -124,7 +165,7 @@ export default function WaitingPage() {
                                         </div>
                                     </div>
                                     <Button
-                                        type={ready ? 'success' : 'primary'}
+                                        type={ready ? 'info' : 'primary'}
                                         disabled={ready || !adminReady}
                                         onClick={handleReady}
                                     >
@@ -139,10 +180,7 @@ export default function WaitingPage() {
                     <Button
                         block
                         type="danger"
-                        onClick={() => {
-                            socket?.leaveRoom()
-                            router.push('/login')
-                        }}
+                        onClick={handleLeave}
                     >
                         离开房间
                     </Button>
@@ -162,5 +200,18 @@ export default function WaitingPage() {
                 </Button>
             )}
         </div>
+    )
+}
+
+// 主组件使用 Suspense 包装
+export default function WaitingPage() {
+    return (
+        <Suspense fallback={
+            <div className="p-4 text-center">
+                <div className="text-lg">加载中...</div>
+            </div>
+        }>
+            <WaitingContent />
+        </Suspense>
     )
 }

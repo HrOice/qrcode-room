@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { Socket } from "socket.io";
 import * as ClientSocket from "socket.io-client";
@@ -11,6 +12,7 @@ export class SocketEmitter {
     private data: any;
     private ackReceived = false;
     private onDisconnected: () => void
+    private response: any;
 
     constructor(socket: Socket | ClientSocket.Socket, event: string, data: any, maxRetry: number, respTimeout: number, onDisconnected: () => void) {
         this.socket = socket;
@@ -22,37 +24,18 @@ export class SocketEmitter {
         this.onDisconnected = onDisconnected
     }
 
-    emitWithRetry() {
-        const timeout = setTimeout(() => {
-            if (this.ackReceived) return;
 
-            if (this.retries < this.maxRetry) {
-                this.retries++;
-                console.log(`Retrying (${this.event}:${JSON.stringify(this.data)}) (${this.retries}/${this.maxRetry})...`);
-                this.emitWithRetry(); // 重新发送请求
-            } else {
-                console.log('Max retries reached, disconnecting...', this.event, this.data);
-                this.socket.disconnect();
-                this.onDisconnected()
-            }
-        }, this.respTimeout); // 每次等待 5 秒
 
-        this.socket.emit(this.event, this.data, () => {
-            this.ackReceived = true;
-            clearTimeout(timeout);
-        })
-
-    }
-
-    async emit() {
+    async emit(cb?: (param: any)=>void) {
         while(this.retries < this.maxRetry) {
             this.retries ++;
-            console.log(`Retrying (${this.event}:${JSON.stringify(this.data)}) (${this.retries}/${this.maxRetry})...`);
+            console.log(`Retrying (${this.event}:${JSON.stringify(this.data)}) (${this.retries}/${this.maxRetry})...`, this.socket.id);
             try {
                 const p = await this.promise();
-                return;
+                cb?.(p)
+                return p;
             } catch (e) {
-                
+                console.log('error', e);
             }
         }
 
@@ -62,19 +45,22 @@ export class SocketEmitter {
     }
 
     promise() {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                console.log('timeout exec, ', this.ackReceived)
-                if (this.ackReceived) resolve(true);
-                reject('timeout')
-            }, this.respTimeout)
-            this.socket.emit(this.event, this.data, () => {
-                console.log("cb received")
-                this.ackReceived = true;
-                clearTimeout(timeout);
-                resolve(true)
-            })
-        })
+        return Promise.race([
+            // Socket 事件响应
+            new Promise((resolve) => {
+                this.socket.emit(this.event, this.data, (response: any) => {
+                    this.response = response;
+                    this.ackReceived = true;
+                    resolve(response);
+                });
+            }),
+            // 超时控制
+            new Promise((_, reject) => 
+                setTimeout(() => {
+                    reject(new Error(`Event ${this.event} timeout after ${this.respTimeout}ms`));
+                }, this.respTimeout)
+            )
+        ]);
     }
 
     static getInstance(socket: Socket | ClientSocket.Socket, event: string, data: any, maxRetry: number, respTimeout: number, onDisconnected: () => void) {

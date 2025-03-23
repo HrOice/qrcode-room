@@ -13,7 +13,7 @@ class RoomStatus {
         this.activeTimeout = activeTimeout;
         this._room = room;
         this.clientLastActive = new Date();
-        this.adminLastActive = new Date();
+        this.adminLastActive = new Date('2000-01-01');
     }
 
     get room() {
@@ -33,10 +33,11 @@ class RoomStatus {
         this.adminLastActive = new Date();
     }
 
-    updateActive(socketId: string) : void {
-        if (socketId == this._room.adminSocketId) {
+    updateActive(role: string) : void {
+        console.log('updateActive', role, this.adminLastActive, this.clientLastActive)
+        if (role === 'admin') {
             this.updateAdminActive();
-        } else if (socketId === this._room.socketId) {
+        } else if (role === 'client') {
             this.updateClientActive()
         } else {
             throw new Error("无效的连接")
@@ -46,12 +47,16 @@ class RoomStatus {
     // 检查是否在线
     isClientOnline(): boolean {
         const now = new Date();
-        return now.getTime() - this.clientLastActive.getTime() <= this.activeTimeout;
+        const r = !!this.room.socketId && (now.getTime() - this.clientLastActive.getTime() <= this.activeTimeout);
+        console.log('isClientOnline', r, this.room.socketId, now, this.clientLastActive)
+        return r;
     }
 
     isAdminOnline(): boolean {
         const now = new Date();
-        return now.getTime() - this.adminLastActive.getTime() <= this.activeTimeout;
+        const r = !!this.room.adminSocketId && (now.getTime() - this.adminLastActive.getTime() <= this.activeTimeout);
+        console.log('isAdminOnline', r, this.room.adminSocketId, now, this.adminLastActive)
+        return r;
     }
 
     isOnline(): boolean {
@@ -73,6 +78,7 @@ class RoomCache {
     private roomMap: Map<number, RoomStatus>;
 
     constructor() {
+        console.log('init roomCache...')
         this.roomMap = new Map<number, RoomStatus>();
     }
 
@@ -109,6 +115,18 @@ class RoomCache {
 }
 export const roomCache = RoomCache.getInstance();
 
+export async function getRoom(id: number) {
+    try {
+        const rs = roomCache.getRoom(id);
+        if (!rs) {
+            throw new Error("room.not.exist")
+        }
+        return rs;
+    } catch (error){
+        console.error('查询房间失败哦:',id, error);
+        throw error;
+    }
+}
 /**
  * 删除房间
  * @param ids 要删除的房间ID数组
@@ -131,7 +149,7 @@ export async function findInactiveRoom(): Promise<RoomStatus[]> {
     try {
         // 查询超时的返回并删除
         return roomCache.getRooms().filter((room) => {
-            return room.isOnline()
+            return !room.isOnline()
         });
     } catch (error) {
         console.error('查找不活跃房间失败:', error);
@@ -142,8 +160,15 @@ export async function findInactiveRoom(): Promise<RoomStatus[]> {
 export async function clientJoinRoom(ip: string, cdkeyId: number, socketId: string, timeout: number): Promise<Room> {
     try {
         const room = await checkRoomOrCreate(ip, cdkeyId, socketId);
-        const rs = new RoomStatus(room, timeout)
-        roomCache.setRoom(rs);
+        let rs = null;
+        if (!roomCache.contains(room.id)) {
+            rs = new RoomStatus(room, timeout)
+            roomCache.setRoom(rs);
+        } else {
+            rs = roomCache.getRoom(room.id)
+            rs!.updateClientActive()
+        }
+
         return room;
     } catch (error) {
         console.error('客户端加入房间失败:', error);
@@ -164,13 +189,14 @@ export async function clientLeaveRoom(roomId: number): Promise<Room | undefined>
     }
 }
 
-export async function heartBeat(roomId: number, socketId: string): Promise<Room | undefined> {
+export async function heartBeat(roomId: number, socketId: string, role: string): Promise<Room | undefined> {
     try {
         const room = roomCache.getRoom(roomId);
         if (!room) {
             return;
         }
-        room.updateActive(socketId)
+        console.log('updateActive', roomId, role, socketId)
+        room.updateActive(role)
         return room.room;
     } catch (error) {
         console.error('心跳更新失败:', error);
@@ -192,6 +218,7 @@ export async function adminJoinRoom(roomId: number, adminId: number, socketId: s
         }
         // 先更新admin信息
         const room = await updateAdminInfo(roomId, adminId, socketId);
+        console.log('admin join', room)
         rs.updateRoom(room);
         rs.updateAdminActive()
         if (!room) {

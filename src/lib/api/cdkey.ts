@@ -25,7 +25,7 @@ export const cdkeyApi = {
         return request<CDKeyListResponse>('/admin/cdkeys', {
             params: {
                 ...params,
-                status: params.status
+                status: params.status!
             }
         })
     },

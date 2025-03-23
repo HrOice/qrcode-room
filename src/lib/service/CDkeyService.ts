@@ -52,38 +52,41 @@ export async function createCDKeys(number: number, totalUse: number) {
  * @param key 
  * @returns 
  */
-export async function validCDKey(key: string):
-    Promise<{ id?: number; key?: string; valid: boolean; }> {
+export async function validCDKey(key: string, id?: number):
+    Promise<{ id?: number; key?: string; valid: boolean; used?: number; total?:number}> {
+    const where: {id?:number, key?:string} = {}
+    if (id != null) {
+        where.id = id;
+    } else {
+        where.key = key
+    }
     const cdkey = await prisma.cDKey.findFirst({
-        where: {
-            key,
-        },
+        where
     });
-    console.log(cdkey)
     if (!cdkey) {
         return {valid: false};
     }
     if (cdkey.used >= cdkey.total) {
         return {id: cdkey.id, key: cdkey.key, valid: false};
     }
-    return {id: cdkey.id, key: cdkey.key, valid: true};
+    return {id: cdkey.id, key: cdkey.key, valid: true, used: cdkey.used, total: cdkey.total };
 }
 /**
  * 使用cdkey
  * @param key 
  * @returns 
  */
-export async function useCDKey(key: string, ip: string) {
-    const cdkey = await prisma.cDKey.findFirst({
+export async function useCDKey(id: number, ip: string, adminId: number) {
+    const cdkey = await prisma.cDKey.findUnique({
         where: {
-            key,
+            id,
         },
     });
     if (!cdkey) {
-        return false;
+        return -1;
     }
     if (cdkey.used >= cdkey.total) {
-        return false;
+        return -1;
     }
     try {
         const result = await prisma.$transaction(async (tx) => {
@@ -105,10 +108,11 @@ export async function useCDKey(key: string, ip: string) {
             await tx.cDKeyRecord.create({
                 data: {
                     cdkeyId: cdkey.id,
-                    ip: ip
+                    ip: ip,
+                    adminId,
                 },
             });
-            return true;
+            return cdkey.used + 1;
         })
 
         return result;

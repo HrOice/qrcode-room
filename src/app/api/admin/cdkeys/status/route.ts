@@ -11,6 +11,7 @@ class CDKeysStatusController {
         try {
             await updateCDKeyStatus(id, status);
         } catch (e) {
+            console.error(e)
             return NextResponse.json({ error: '更新失败' }, { status: 500 });
         }
         return NextResponse.json({ result: true });

@@ -1,4 +1,5 @@
 
+import { subMinutes } from "date-fns";
 import prisma from "../db";
 
 // 维护ip的房间状态
@@ -144,5 +145,18 @@ export async function findRoom(id: number) {
     return await prisma.room.findUnique({
         where: {id},
         include: {cdkey: true}
+    })
+}
+
+export async function cleanUnactiveRoom(activeRooms: number[]) {
+    return await prisma.room.deleteMany({
+        where: {
+            id: {
+                notIn: activeRooms
+            },
+            createdAt: {
+                lt: subMinutes(new Date(), 10)
+            }
+        }
     })
 }

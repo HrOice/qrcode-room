@@ -5,7 +5,7 @@ import { formatDate } from '@/lib/utils/dateFormat';
 import { Search } from '@react-vant/icons';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button, Dialog, Input } from 'react-vant';
 
 export default function RoomListPage() {
@@ -15,7 +15,7 @@ export default function RoomListPage() {
     const [searchId, setSearchId] = useState('')
 
     // 获取房间列表
-    const fetchRooms = async () => {
+    const fetchRooms = useCallback(async () => {
         setLoading(true)
         try {
             const data = await roomApi.getRooms(searchId)
@@ -27,7 +27,8 @@ export default function RoomListPage() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [searchId]) // 添加 searchId 作为依赖
+
 
     // 加入房间
     const handleJoin = async (roomId: number) => {
@@ -58,7 +59,7 @@ export default function RoomListPage() {
 
     useEffect(() => {
         fetchRooms()
-    }, [])
+    }, [fetchRooms])
 
     return (
         <div className="space-y-4">
@@ -148,9 +149,9 @@ export default function RoomListPage() {
                             <Button block type="primary" size="small" onClick={() => handleJoin(room.id)}>
                                 加入
                             </Button>
-                            <Button block type="danger" size="small" onClick={() => handleDelete(room.id)}>
-                                删除
-                            </Button>
+                            {/*<Button block type="danger" size="small" onClick={() => handleDelete(room.id)}>*/}
+                            {/*    删除*/}
+                            {/*</Button>*/}
                         </div>
                     </div>
                 ))}

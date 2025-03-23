@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { requireSuperAdmin } from '@/lib/decorators/auth'
 import { AddUser, GetUserList, UpdateStatus } from '@/lib/service/AdminUserService'
 import { NextRequest, NextResponse } from 'next/server'

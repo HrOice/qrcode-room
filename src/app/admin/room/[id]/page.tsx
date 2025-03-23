@@ -25,7 +25,7 @@ export default function RoomDetailPage() {
     const [room, setRoom] = useState<RoomDetail | null>(null)
     const [isReady, setIsReady] = useState(false)
     const [userReady, setUserReady] = useState(false)
-    const [inputType, setInputType] = useState<'text' | 'image'>('text')
+    const [userOnline, setUserOnline] = useState(false)
     const [textValue, setTextValue] = useState('')
     const [qrCodeData, setQrCodeData] = useState<{
         url: string;
@@ -33,12 +33,19 @@ export default function RoomDetailPage() {
     } | null>(null)
     const [loading, setLoading] = useState(false)
     const [reconnect, setReconnect] = useState(true)
+    const [reconnectKey, setReconnectKey] = useState(0) // 添加重连计数器
     const [leaveModalOpen, setLeaveModalOpen] = useState(false)
-
+    const readyRef = useRef(false)  // 添加 ref 来跟踪最新状态'
+    const [usedCount, setUsedCount ] = useState(0)
+    
+    useEffect(() => {
+        readyRef.current = isReady  // 当 ready 状态改变时更新 ref
+    }, [isReady])
     // 获取房间详情
     const fetchRoomDetail = useCallback(async () => {
         const { room } = await roomApi.getRoom(roomId)
         setRoom(room)
+        setUsedCount(room.cdkey.used)
     }, [roomId])
     // 使用 useRef 确保 socket 实例只初始化一次
     const roomSocketRef = useRef<RoomSocket | null>(null)
@@ -66,6 +73,25 @@ export default function RoomDetailPage() {
                 () => {
                     toast.success('用户已离开房间')
                     setUserReady(false)
+                    setUserOnline(false)
+                },
+                () => {
+                    return {
+                        ready: readyRef.current,
+                    }
+                },
+                (roomId, ready, online) => {
+                    debugger
+                    setUserReady(ready);
+                    setUserOnline(online)
+                }, (param) => {
+                    const {online, ready} = param
+                    setUserOnline(online)
+                    setUserReady(ready)
+                }, () => {
+                    setUserOnline(true)
+                    setUserReady(false)
+                    setIsReady(false)
                 }
             )
 
@@ -77,17 +103,17 @@ export default function RoomDetailPage() {
         return () => {
             // 清理 socket 连接
             if (roomSocketRef.current) {
-                roomSocketRef.current.adminDisconnect()
+                roomSocketRef.current!.adminDisconnect()
                 roomSocketRef.current = null
             }
         }
-    }, [roomId, router, fetchRoomDetail])
+    }, [roomId, router, fetchRoomDetail, reconnectKey])
 
     // 处理准备状态
     const handleReady = () => {
         if (!roomSocketRef.current) return
         const r = !isReady;
-        roomSocketRef.current.adminReady(r, (re) => {
+        roomSocketRef.current!.adminReady(r, (re) => {
             setIsReady(re)
         })
     }
@@ -106,6 +132,7 @@ export default function RoomDetailPage() {
                 setQrCodeData(null)
             }
         } catch (error) {
+            console.error(error)
             toast.error('生成二维码失败')
         }
     }
@@ -134,6 +161,7 @@ export default function RoomDetailPage() {
                 setQrCodeData(null)
             }
         } catch (error) {
+            console.error(error)
             toast.error('识别二维码失败')
         }
     }
@@ -143,8 +171,10 @@ export default function RoomDetailPage() {
         if (!roomSocketRef.current || !qrCodeData) return
         setLoading(true)
         try {
-            roomSocketRef.current.adminSend(qrCodeData.url)
-            toast.success('提交成功')
+            roomSocketRef.current!.adminSend(qrCodeData.url, (used) => {
+                toast.success(used>0?'提交成功':'没有次数')
+                if (used>0) {setUsedCount(used)}
+            })
         } catch (error) {
             console.error(error)
             toast.error('提交失败')
@@ -157,7 +187,7 @@ export default function RoomDetailPage() {
     const handleLeave = () => {
 
         if (roomSocketRef.current) {
-            roomSocketRef.current.adminLeaveRoom()
+            roomSocketRef.current?.adminLeaveRoom()
         }
         router.push('/admin/room')
     }
@@ -183,12 +213,24 @@ export default function RoomDetailPage() {
                     </div>
                 </div>
                 <div className="text-sm text-gray-600">
-                    剩余使用次数: {room.cdkey.total - room.cdkey.used}/{room.cdkey.total}
+                    剩余使用次数: {room.cdkey.total - usedCount}/{room.cdkey.total}
                 </div>
             </div>
+            {/* 重连按钮 */}
+            {reconnect && (
+                <Button
+                    block
+                    type='primary'
+                    onClick={() => {
+                        setReconnectKey(prev => prev + 1)
+                    }}
+                >
+                    重新连接
+                </Button>
+            )}
 
             {/* 操作区域 */}
-            {isReady && userReady && (
+            {!reconnect && isReady && userReady && (
                 <div className="bg-white rounded-lg p-4 space-y-4">
                     {/* 文本输入 */}
                     <Input.TextArea
@@ -259,23 +301,31 @@ export default function RoomDetailPage() {
             )}
 
             {/* 准备状态 */}
+            {!reconnect && (
             <div className="bg-white rounded-lg p-4 space-y-4">
                 <div className="flex justify-between items-center">
-                    <div>
-                        用户状态:
-                        <span className={`ml-2 ${userReady ? 'text-green-600' : 'text-yellow-600'}`}>
-                            {userReady ? '已准备' : '未准备'}
-                        </span>
+                    <div className="space-y-2">
+                        <div>
+                            用户状态:
+                            <span className={`ml-2 ${userOnline ? 'text-green-600' : 'text-red-600'}`}>
+                                {userOnline ? '在线' : '离线'}
+                            </span>
+                            {userOnline && (
+                                <span className={`ml-2 ${userReady ? 'text-green-600' : 'text-yellow-600'}`}>
+                                    {userReady ? '已准备' : '未准备'}
+                                </span>
+                            )}
+                        </div>
                     </div>
                     <Button
-                        type={isReady ? 'success' : 'primary'}
-                        disabled={isReady}
+                        type={isReady ? 'info' : 'primary'}
+                        disabled={isReady || !userOnline} // 用户不在线时禁用准备按钮
                         onClick={handleReady}
                     >
                         {isReady ? '已准备' : '准备'}
                     </Button>
                 </div>
-            </div>
+            </div>)}
 
             {/* 离开按钮 */}
             <Button block type="danger" onClick={() => setLeaveModalOpen(true)}>

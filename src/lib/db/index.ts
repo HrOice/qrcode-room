@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/db/index.ts
 import { PrismaClient } from '@prisma/client'
 

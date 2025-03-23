@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 import { io, Socket } from 'socket.io-client'
 import { getClientIp } from '../utils/getClientIp'
 import { SocketEmitter } from './socketUtil'
@@ -53,11 +55,14 @@ export class RoomSocket {
     }
 
     // 用户加入房间
-    async joinRoom(onAdminJoin: () => void, 
-    onAdminReady: (ready: boolean) => void, 
-    onAdminLeft: () => void, 
-    onJoinRoom: (roomId: number) => void,
-    onReceiveImg: (data:string) => void) {
+    async joinRoom(onAdminJoin: () => void,
+        onAdminReady: (ready: boolean) => void,
+        onAdminLeft: () => void,
+        onJoinRoom: (roomId: number, adminReady: boolean, adminOnline: boolean, used: number, total: number) => void,
+        onReceiveImg: (data: string, used: number) => void,
+        onStatus: () => { ready: boolean },
+        _onHeartBeat: (param: {roomId: number, ready: boolean, online: boolean}) => void
+    ) {
         const ip = await getClientIp()
         console.log("joi room", ip)
         this.socket.on('admin-join', () => {
@@ -67,64 +72,85 @@ export class RoomSocket {
         // admin准备
         this.socket.on('admin-ready', onAdminReady)
         // admin离开 
-        this.socket.on('admin-left', (cb) => {
+        this.socket.on('admin-left', () => {
             console.log('admin left ')
             onAdminLeft()
+        })
+        this.socket.on('admin-send', (data, used, cb) => {debugger
+            onReceiveImg(data, used)
             cb()
         })
-        this.socket.on('admin-send', (data, cb) => {
-            onReceiveImg( data)
-            cb()
+        this.socket.on('status', (cb) => {
+            const status = onStatus()
+            console.log('onStatus', status)
+            cb(status)
         })
         // 加入房间
-        this.socket.emit('join-room', { ip, key: this.token }, (roomId: number) => {
-            this.roomId = roomId
-            onJoinRoom(this.roomId)
-            console.log('user join room', roomId)
-            this.startHeartbeat()
-        })
+        this.socket.emit('join-room', { ip, key: this.token },
+            (response: { roomId: number, ready: boolean, online: boolean, used: number, total: number }) => {
+                const { roomId, ready, online, used, total } = response
+                this.roomId = roomId
+                onJoinRoom(this.roomId!, ready, online, used, total)
+                console.log('user join room', roomId)
+                this.startHeartbeat()
+            })
     }
 
     // 管理员加入房间
-    async adminJoin(roomId: number, onUserReady: (ready: boolean) => void, onUserLeft: () => void) {
+    async adminJoin(roomId: number,
+        onUserReady: (ready: boolean) => void,
+        onUserLeft: () => void,
+        onStatus: () => { ready: boolean },
+        onJoinRoom: (roomId: number, clientReady: boolean, clientOnline: boolean) => void,
+        _onHeartBeat: (param: {roomId: number, ready: boolean, online: boolean}) => void,
+                    onUserJoin: () => void
+    ) {
 
-        this.socket.emit('admin-join', { roomId }, () => {
+        this.socket.emit('admin-join', { roomId }, (response: { roomId: number, ready: boolean, online: boolean }) => {
 
+            const { roomId, ready, online } = response
             this.roomId = roomId
-            console.log('admin join room', roomId)
+            console.log('admin join room', response)
+            onJoinRoom(this.roomId!, ready, online)
             this.startHeartbeat()
         })
-
+        this.socket.on('user-join', onUserJoin)
         this.socket.on('user-ready', onUserReady)
         this.socket.on('user-left', onUserLeft)
+        this.socket.on('status', (cb) => {
+            const status = onStatus()
+            cb(status)
+        })
     }
 
-    async adminReady(ready: boolean, onReady:(ready:boolean) => void) {
-        this.socket.emit('admin-ready', ready, (response:boolean) => {
+    async adminReady(ready: boolean, onReady: (ready: boolean) => void) {
+        this.socket.emit('admin-ready', ready, (response: boolean) => {
             onReady(response)
         })
     }
 
-    async userReady(ready: boolean, onReady:(ready:boolean) => void) {
-        this.socket.emit('user-ready', ready, (response:boolean) => {
+    async userReady(ready: boolean, onReady: (ready: boolean) => void) {
+        this.socket.emit('user-ready', ready, (response: boolean) => {
             onReady(response)
         })
     }
     // type 0 图片，1文本
-    async adminSend(data: string) {
-        this.socket.emit('admin-send', data)
+    async adminSend(data: string, onSuccess: (used: number) => void) {
+        this.socket.emit('admin-send', data, (used: number) => {
+            onSuccess(used)
+        })
     }
 
     // 开始发送心跳包
     private startHeartbeat() {
         if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval)
+            clearInterval(this.heartbeatInterval as NodeJS.Timeout)
         }
 
         this.heartbeatInterval = setInterval(() => {
             if (this.roomId) {
                 SocketEmitter.getInstance(this.socket, 'heartbeat', { roomId: this.roomId }, 1, 3000, () => {
-                    clearInterval(this.heartbeatInterval)
+                    clearInterval(this.heartbeatInterval as NodeJS.Timeout)
                 }).emit();
             }
         }, 4000)
@@ -134,26 +160,27 @@ export class RoomSocket {
 
     // 离开房间
     adminLeaveRoom() {
-        console.log('admin-left', this.roomId)
-        if (this.roomId) {
-            this.socket.emit('admin-left', { roomId: this.roomId }, () => {
-                debugger;
-            })
-            this.roomId = null
-        }
+        // console.log('admin-left', this.roomId)
+        // if (this.roomId) {
+        //     this.socket.emit('admin-left', { roomId: this.roomId }, () => {
+        //         debugger;
+        //     })
+        //     this.roomId = null
+        // }
         if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval)
+            clearInterval(this.heartbeatInterval as NodeJS.Timeout)
             this.heartbeatInterval = null
         }
     }
 
     clientLeaveRoom() {
-        if (this.roomId) {
-            this.socket.emit('user-left', { roomId: this.roomId })
-            this.roomId = null
-        }
+        // if (this.roomId) {
+        //
+        //     this.socket.emit('user-left', { roomId: this.roomId })
+        //     this.roomId = null
+        // }
         if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval)
+            clearInterval(this.heartbeatInterval as NodeJS.Timeout)
             this.heartbeatInterval = null
         }
     }
@@ -170,6 +197,7 @@ export class RoomSocket {
     }
 
     adminDisconnect() {
-
+        this.adminLeaveRoom()
+        this.socket.disconnect()
     }
 }

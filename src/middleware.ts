@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const payload = await jwtUtils.verify(token)
+    const payload = await jwtUtils.verify(token) as { id: number; role: string }
     if (!payload) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
