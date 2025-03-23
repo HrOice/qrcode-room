@@ -5,22 +5,85 @@
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* React Vant 样式自定义 */
+:root {
+  --rv-black: #171717;
+  --rv-white: #ffffff;
+  --rv-primary-color: #1989fa;
+  --rv-tabbar-item-text-color: #666;
+  --rv-tabbar-item-active-color: #1989fa;
+  --rv-padding-base: 8px;
+  --rv-padding-xs: 8px;
+  --rv-font-size-sm: 14px;
+}
+
+/* 修复样式冲突 */
+.rv-button {
+  all: revert;
+}
+
+/* 自定义 Tabbar 样式 */
+.rv-tabbar--vertical {
+  height: auto !important;
+}
+
+.rv-tabbar-item--vertical {
+  height: 48px !important;
+  padding: 8px !important;
+}
+
+.rv-tabbar-item--active {
+  background-color: #f5f5f5;
+  font-weight: 500;
+}
+
+.rv-popup {
+  overflow: hidden;
+}
+
+.rv-button {
+  padding: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* 菜单选中状态样式 */
+.rv-cell--active {
+  position: relative;
+  background-color: #f0f9ff;
+  color: #1989fa;
+}
+
+.rv-cell--active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: #1989fa;
+}
+
+.rv-cell--active .rv-icon {
+  color: #1989fa;
+}
+
+/* CDKey列表样式 */
+.rv-cell {
+  padding: 16px !important;
+}
+
+.rv-cell:hover {
+  background-color: #f5f5f5;
+}
+
+.rv-cell__value {
+  flex: 1;
 }
