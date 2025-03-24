@@ -2,9 +2,10 @@ import { createServer } from 'http'
 import next from 'next'
 import { parse } from 'url'
 import { createSocketServer } from './src/lib/socket/server'
+import "tsconfig-paths/register";
 
 const dev = process.env.NODE_ENV !== 'production'
-const app = next({ dev, turbopack: true })
+const app = next({ dev, turbopack: true, dir: '.' })
 const handle = app.getRequestHandler()
 
 app.prepare().then(() => {

@@ -1,10 +1,10 @@
 'use client'
 
-import { Bars, UserO, WapHomeO } from '@react-vant/icons';
+import { Bars, UserO, WapHomeO } from '@react-vant/icons'; // 添加 CloseO 图标
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { Button, Cell, Popup } from 'react-vant';
+import { Button, Cell, Popup } from 'react-vant'; // 添加 Dialog
 
 export default function AdminLayout({
     children,
@@ -36,6 +36,12 @@ export default function AdminLayout({
             icon: <WapHomeO />,
         },
     ]
+
+    const handleLogout = () => {
+        localStorage.removeItem('auth-token');  // 清除认证令牌
+        router.push('/admin/login');  // 跳转到登录页
+        setVisible(false);  // 关闭菜单
+    };
 
     return (
         <div className="min-h-screen flex flex-col bg-white text-gray-900">
@@ -79,6 +85,14 @@ export default function AdminLayout({
                                 }}
                             />
                         ))}
+                    </div>
+                    {/* 添加退出按钮 */}
+                    <div className="border-t">
+                        <Cell
+                            title="退出"
+                            className="text-red-500"
+                            onClick={handleLogout}
+                        />
                     </div>
                 </div>
             </Popup>

@@ -1,13 +1,19 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "commonjs",
+    "target": "ES2020",
+    "module": "CommonJS",
     "outDir": "dist",
-    "noEmit": false,
-    "target": "es6",
+    "rootDir": "./",
+    "strict": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "baseUrl": "./",
   },
-  "include": ["server.ts", "src/lib/socket"]
+  "include": ["server.ts"]
 }

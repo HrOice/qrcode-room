@@ -1,9 +1,9 @@
-import { requireSuperAdmin } from "@/lib/decorators/auth";
+import { requireAdmin } from "@/lib/decorators/auth";
 import { updateCDKeyStatus } from "@/lib/service/CDkeyService";
 import { NextRequest, NextResponse } from "next/server";
 
 class CDKeysStatusController {
-    @requireSuperAdmin()
+    @requireAdmin()
     static async PUT(request: NextRequest): Promise<NextResponse> {
         // 更新状态，从body获取id,status
         const { id, status } = await request.json();

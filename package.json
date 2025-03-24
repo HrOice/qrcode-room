@@ -5,8 +5,13 @@
   "scripts": {
     "dev": "ts-node -r tsconfig-paths/register --project tsconfig.server.json server.ts",
     "build": "next build",
+    "tsbuild":"next build && tsc server.ts" ,
     "start": "NODE_ENV=production ts-node -r tsconfig-paths/register --project tsconfig.server.json server.ts",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:seed": "npx prisma db seed"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.js"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
@@ -16,6 +21,7 @@
     "jose": "^6.0.10",
     "jsqr": "^1.4.0",
     "next": "15.2.3",
+    "prisma": "^6.5.0",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

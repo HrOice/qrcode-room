@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { requireSuperAdmin } from '@/lib/decorators/auth'
+import { requireAdmin, requireSuperAdmin } from '@/lib/decorators/auth'
 import { AddUser, GetUserList, UpdateStatus } from '@/lib/service/AdminUserService'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -23,7 +23,7 @@ class UserController {
 
         return NextResponse.json(true)
     }
-    @requireSuperAdmin()
+    @requireAdmin()
     static async GET(request: NextRequest) {
         const searchParams = request.nextUrl.searchParams
         const page = parseInt(searchParams.get('page') || '1')

@@ -62,6 +62,18 @@ export async function AddUser(username: string, password: string) {
     return user;
 }
 
+export async function UpdatePassword(id: number, password: string) {
+    const user = await prisma.user.update({
+        data: {
+            password,
+        },
+        where: {
+            id: id
+        }
+    });
+    return user;
+}
+
 export async function UpdateStatus(id: number, status: number) {
     status = status === 1 ? 1 : 0;
     if (id == 1) {

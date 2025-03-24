@@ -23,7 +23,7 @@ export default function AdminLogin() {
         if (data.token) {
             setAuth(data.token, data.user)
             toast('登录成功', { icon: '🎉' })
-            router.push('/admin/user')
+            router.push('/admin/cdkey')
         } else {
             toast('登录失败', { icon: '❌' })
         }

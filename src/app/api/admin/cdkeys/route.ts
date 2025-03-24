@@ -1,10 +1,10 @@
-import { requireSuperAdmin } from "@/lib/decorators/auth";
+import { requireAdmin } from "@/lib/decorators/auth";
 import { createCDKeys, getCDKeys } from "@/lib/service/CDkeyService";
 import { QueryParser } from "@/lib/utils/queryParser";
 import { NextRequest, NextResponse } from "next/server";
 
 class CDKeysController {
-    @requireSuperAdmin()
+    @requireAdmin()
     static async GET(request: NextRequest): Promise<NextResponse> {
         const params = request.nextUrl.searchParams;
 
@@ -28,7 +28,7 @@ class CDKeysController {
     /** 
      * 新增cdkey
      */
-    @requireSuperAdmin()
+    @requireAdmin()
     static async POST(request: NextRequest): Promise<NextResponse> {
         const { number, totalUse } = await request.json();
         // 新增cdkey
