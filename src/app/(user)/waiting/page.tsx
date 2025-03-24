@@ -12,17 +12,17 @@ import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { Qr } from '@react-vant/icons'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Button, Input, Uploader, UploaderValueItem } from 'react-vant'
 
 
 
-export default function RoomDetailPage() {
+// 创建一个包装组件
+function WaitingRoom() {
+    const searchParams = useSearchParams()
     const router = useRouter()
 
-
-    const searchParams = useSearchParams()
 
     const [room, setRoom] = useState<RoomDetail | null>(null)
     const [isReady, setIsReady] = useState(false)
@@ -134,7 +134,7 @@ export default function RoomDetailPage() {
                 roomSocketRef.current = null
             }
         }
-    }, [roomId, router, fetchRoomDetail, reconnectKey])
+    }, [roomId, router, fetchRoomDetail, reconnectKey, searchParams])
 
     // 处理准备状态
     const handleReady = () => {
@@ -172,27 +172,40 @@ export default function RoomDetailPage() {
                     url: items[0].url!,
                     type: 'image'
                 })
-    
+
                 // 使用 Jimp 处理图片
                 const image = await Jimp.read(items[0].url!)
-                
+
                 // 可以添加图片预处理以提高识别率
                 image
                     .normalize() // 标准化像素值
+                    // .quality(80)
                     .contrast(0.2) // 增加对比度
-                    .resize({w:800, mode:ResizeStrategy.BILINEAR}) // 调整大小但保持比例
-                
+                    .resize({ w: 800, mode: ResizeStrategy.BILINEAR }) // 调整大小但保持比例
+
                 const { width, height } = image.bitmap
                 const imageData = new Uint8ClampedArray(image.bitmap.data)
-    
+
                 // 使用增强的配置进行识别
                 const code = jsQR(imageData, width, height, {
-                    inversionAttempts: "attemptBoth", // 尝试黑白两种模式
+                    inversionAttempts: "dontInvert", // 尝试黑白两种模式
 
                 })
-    
+
                 if (code) {
+                    // 识别成功后，使用文本重新生成小尺寸二维码
+                    const compressedQR = await QRCode.toDataURL(code.data, {
+                        width: 400,
+                        margin: 1,
+                        scale: 4,
+                        // quality: 0.8,
+                    })
+
                     setTextValue(code.data)
+                    setQrCodeData({
+                        url: compressedQR,
+                        type: 'text'  // 改为text类型，这样发送时会使用文本重新生成
+                    })
                     toast.success('已识别二维码内容')
                 } else {
                     toast.error('未检测到二维码，请尝试调整图片亮度或对比度')
@@ -206,12 +219,25 @@ export default function RoomDetailPage() {
 
     // 处理提交
     const handleSubmit = async () => {
-        if (!roomSocketRef.current || !qrCodeData) return
+        if (!roomSocketRef.current || !textValue) return
         setLoading(true)
         try {
-            roomSocketRef.current!.adminSend(qrCodeData.url, (used) => {
+            // 根据文本内容重新生成二维码
+            const qrDataUrl = await QRCode.toDataURL(textValue, {
+                width: 400, // 限制宽度
+                margin: 1,  // 减小边距
+                // quality: 0.8, // 降低质量以减小大小
+                scale: 4, // 降低缩放比例
+                type: 'image/jpeg', // 使用 JPEG 格式代替 PNG
+
+            })            // 发送生成的二维码
+            const dataSize = qrDataUrl.length
+            console.log('sending qr code, size:', Math.round(dataSize / 1024), 'KB')
+            roomSocketRef.current!.adminSend(qrDataUrl, (used) => {
                 toast.success(used > 0 ? '提交成功' : '没有次数')
-                if (used > 0) { setUsedCount(used) }
+                if (used > 0) {
+                    setUsedCount(used)
+                }
             })
         } catch (error) {
             console.error(error)
@@ -307,61 +333,8 @@ export default function RoomDetailPage() {
         scanIntervalRef.current = interval
     }
 
-    // 修改 scanQRCode 函数
-    const scanQRCode = () => {
-        if (!videoRef.current || !videoRef.current.videoWidth) return
-
-        const canvas = document.createElement('canvas')
-        const context = canvas.getContext('2d')
-        if (!context) return
-
-        // 使用实际视频尺寸
-        const { videoWidth, videoHeight } = videoRef.current
-        canvas.width = videoWidth
-        canvas.height = videoHeight
-
-        // 绘制当前视频帧
-        context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight)
-
-        // 获取图像数据
-        const imageData = context.getImageData(0, 0, videoWidth, videoHeight)
-
-        try {
-            // 增加容错处理
-            const code = jsQR(
-                imageData.data,
-                imageData.width,
-                imageData.height,
-                {
-                    inversionAttempts: "dontInvert", // 提高识别速度
-                }
-            )
-
-            if (code) {
-                console.log('识别到二维码:', code.data) // 调试用
-
-                // 验证二维码数据是否有效
-                if (code.data && code.data.trim()) {
-                    // 识别成功后的处理
-                    setTextValue(code.data)
-                    QRCode.toDataURL(code.data).then(url => {
-                        setQrCodeData({
-                            url: url,
-                            type: 'text'
-                        })
-                        toast.success('已识别二维码')
-                        stopCamera()  // 识别成功后关闭相机
-                    })
-                }
-            }
-        } catch (error) {
-            console.error('扫描二维码出错:', error)
-        }
-    }
-
-
     // 修改停止相机函数
-    const stopCamera = () => {
+    const stopCamera = useCallback(() => {
         // 清理扫描定时器
         if (scanIntervalRef.current) {
             clearInterval(scanIntervalRef.current)
@@ -375,14 +348,60 @@ export default function RoomDetailPage() {
         }
 
         setShowCamera(false)
-    }
+    }, [])
+    // 修改 scanQRCode 函数
+    // 使用 useCallback 包装 scanQRCode 函数
+    const scanQRCode = useCallback(() => {
+        if (!videoRef.current || !videoRef.current.videoWidth) return
+
+        const canvas = document.createElement('canvas')
+        const context = canvas.getContext('2d')
+        if (!context) return
+
+        // 使用实际视频尺寸
+        const { videoWidth, videoHeight } = videoRef.current
+        canvas.width = videoWidth
+        canvas.height = videoHeight
+
+        // 绘制当前视频帧
+        context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight)
+        const imageData = context.getImageData(0, 0, videoWidth, videoHeight)
+
+        try {
+            const code = jsQR(
+                imageData.data,
+                imageData.width,
+                imageData.height,
+                {
+                    inversionAttempts: "dontInvert",
+                }
+            )
+
+            if (code && code.data && code.data.trim()) {
+                setTextValue(code.data)
+                QRCode.toDataURL(code.data).then(url => {
+                    setQrCodeData({
+                        url: url,
+                        type: 'text'
+                    })
+                    toast.success('已识别二维码')
+                    stopCamera()
+                })
+            }
+        } catch (error) {
+            console.error('扫描二维码出错:', error)
+        }
+    }, [stopCamera]) // 添加 stopCamera 作为依赖
+
+
+
 
     // 在组件卸载时清理相机
     useEffect(() => {
         return () => {
             stopCamera()
         }
-    }, [])
+    }, [stopCamera])
 
     // 添加定时扫描逻辑
     useEffect(() => {
@@ -398,7 +417,7 @@ export default function RoomDetailPage() {
                 clearInterval(scanInterval as NodeJS.Timeout);
             }
         };
-    }, [showCamera]);
+    }, [showCamera, scanQRCode]);
 
     const generateRoomQR = useCallback(async () => {
         if (!room) return
@@ -493,6 +512,7 @@ export default function RoomDetailPage() {
                                         <Uploader
                                             value={qrCodeData?.type === 'image' ? [{ url: qrCodeData.url }] : []}
                                             onChange={handleImageUpload}
+                                            previewFullImage={false}
                                             multiple={false}
                                             maxCount={1}
                                             className="!block"
@@ -517,6 +537,7 @@ export default function RoomDetailPage() {
                                     onChange={handleImageUpload}
                                     multiple={false}
                                     maxCount={1}
+                                    previewFullImage={false}
                                 >
                                     <div className="text-gray-400 text-sm text-center p-4">
                                         <div>点击上传二维码图片</div>
@@ -686,4 +707,13 @@ export default function RoomDetailPage() {
                     </DialogPanel>
                 </div>
             </Dialog></div>)
+}
+
+// 修改默认导出组件
+export default function RoomDetailPage() {
+    return (
+        <Suspense fallback={<div className="p-4 text-center">加载中...</div>}>
+            <WaitingRoom />
+        </Suspense>
+    )
 }

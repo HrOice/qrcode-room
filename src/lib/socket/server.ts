@@ -248,7 +248,7 @@ export function createSocketServer(server: any) {
       }
       socket.to(String(roomId)).emit('admin-send', data, used! + 1, async () => {
         // 发送成功减次数
-        console.log('send success........', roomId, cb);
+        console.log('send success........', roomId, data.length);
         const used = await useCDKey(socket.data.keyId, socket.data.ip, socket.data.adminId)
         cb(used)
       })
