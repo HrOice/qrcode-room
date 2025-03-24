@@ -38,8 +38,13 @@ export const roomApi = {
     });
   },
 
-  getRoom: async (id: number): Promise<{room:RoomDetail}> => {
+  getAdminRoom: async (id: number): Promise<{room:RoomDetail}> => {
     return request(`/admin/rooms/${id}`, {
+        method: 'GET'
+    })
+  },
+  getRoom: async (id: number): Promise<{room:RoomDetail}> => {
+    return request(`/rooms/${id}`, {
         method: 'GET'
     })
   }
