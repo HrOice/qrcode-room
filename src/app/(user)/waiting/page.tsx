@@ -233,35 +233,35 @@ export default function RoomDetailPage() {
     const startCamera = async () => {
         try {
             // 检查浏览器是否支持 mediaDevices
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                // 尝试使用老版本的 API
-                const getUserMedia = navigator.getUserMedia ||
-                    navigator.webkitGetUserMedia ||
-                    navigator.mozGetUserMedia ||
-                    navigator.msGetUserMedia;
+            // if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            //     // 尝试使用老版本的 API
+            //     const getUserMedia = navigator.getUserMedia ||
+            //         navigator.webkitGetUserMedia ||
+            //         navigator.mozGetUserMedia ||
+            //         navigator.msGetUserMedia;
 
-                if (!getUserMedia) {
-                    // throw new Error('您的浏览器不支持访问相机，请使用最新版本的Chrome/Firefox/Safari')
-                } else {
-                    // 使用老版本 API
-                    getUserMedia.call(navigator,
-                        { video: { facingMode: 'environment' } },
-                        (stream) => {
-                            if (videoRef.current) {
-                                videoRef.current.srcObject = stream
-                                streamRef.current = stream
-                                setShowCamera(true)
-                                startScanning()
-                            }
-                        },
-                        (error) => {
-                            throw error
-                        }
-                    )
-                    return
-                }
+            //     if (!getUserMedia) {
+            //         // throw new Error('您的浏览器不支持访问相机，请使用最新版本的Chrome/Firefox/Safari')
+            //     } else {
+            //         // 使用老版本 API
+            //         getUserMedia.call(navigator,
+            //             { video: { facingMode: 'environment' } },
+            //             (stream) => {
+            //                 if (videoRef.current) {
+            //                     videoRef.current.srcObject = stream
+            //                     streamRef.current = stream
+            //                     setShowCamera(true)
+            //                     startScanning()
+            //                 }
+            //             },
+            //             (error) => {
+            //                 throw error
+            //             }
+            //         )
+            //         return
+            //     }
 
-            }
+            // }
 
             // 使用现代 API
             const stream = await navigator.mediaDevices.getUserMedia({
