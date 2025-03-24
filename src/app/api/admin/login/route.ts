@@ -1,5 +1,5 @@
 
-import * as AdminUserService from '@/lib/service/AdminUserService'
+import { AdminLogin } from '@/lib/service/AdminUserService'
 import { NextRequest, NextResponse } from 'next/server'
 
 class UserController {
@@ -7,7 +7,7 @@ class UserController {
     static async POST(req: NextRequest): Promise<NextResponse> {
         const { username, password } = await req.json()
         console.log(username, password)
-        const user = await AdminUserService.AdminLogin(username, password)
+        const user = await AdminLogin(username, password)
         if (!user) {
             return NextResponse.json({ error: 'Invalid username or password' }, { status: 403 })
         }

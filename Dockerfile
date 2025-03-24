@@ -1,5 +1,5 @@
 # 依赖阶段
-FROM docker.m.daocloud.io/node:18-alpine AS deps
+FROM docker.m.daocloud.io/node:20-alpine AS deps
 WORKDIR /app
 
 # 仅复制依赖相关文件
@@ -8,7 +8,7 @@ RUN npm config set registry http://registry.npm.taobao.org/ && \
     npm install
 
 # 构建阶段
-FROM docker.m.daocloud.io/node:18-alpine
+FROM docker.m.daocloud.io/node:20-alpine
 WORKDIR /app
 
 # 从依赖阶段复制 node_modules

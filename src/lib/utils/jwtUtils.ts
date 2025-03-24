@@ -1,4 +1,5 @@
-import * as jose from 'jose'
+import { jwtVerify, SignJWT } from 'jose'
+import { TextEncoder } from 'node:util'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-secret-key'
@@ -12,7 +13,7 @@ export interface JWTPayload {
 
 export const jwtUtils = {
     async sign(payload: JWTPayload) {
-        const jwt = await new jose.SignJWT({ ...payload })
+        const jwt = await new SignJWT({ ...payload })
             .setProtectedHeader({ alg: 'HS256' })
             .setExpirationTime('7d')
             .sign(JWT_SECRET)
@@ -21,7 +22,7 @@ export const jwtUtils = {
 
     async verify(token: string) {
         try {
-            const { payload } = await jose.jwtVerify(token, JWT_SECRET)
+            const { payload } = await jwtVerify(token, JWT_SECRET)
             return payload;
         } catch (error) {
             console.error('jwt verify error:', error)
