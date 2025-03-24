@@ -18,7 +18,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # 生成 Prisma 客户端并构建应用
-RUN npx prisma generate && \
+RUN npx prisma generate && \ 
     npm run build
 
 # 设置环境变量

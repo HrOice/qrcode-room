@@ -1,5 +1,4 @@
 import { jwtVerify, SignJWT } from 'jose'
-import { TextEncoder } from 'node:util'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-secret-key'
