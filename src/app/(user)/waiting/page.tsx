@@ -106,7 +106,7 @@ function WaitingRoom() {
                     }
                 },
                 (roomId, ready, online) => {
-                    debugger
+
                     setRoomId(roomId)
                     // 获取房间详情
                     fetchRoomDetail()
@@ -288,7 +288,14 @@ function WaitingRoom() {
             //     }
 
             // }
+            // 先检查浏览器支持
+            setShowCamera(true)
 
+            // return;
+            if (!navigator.mediaDevices?.getUserMedia) {
+                toast.error('您的浏览器不支持访问相机')
+                return
+            }
             // 使用现代 API
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
@@ -298,10 +305,24 @@ function WaitingRoom() {
                 }
             })
 
+            // 检查 video 元素是否存在
+            if (!videoRef.current) {
+                console.error('video 元素未找到')
+                return
+            }
+            debugger
             if (videoRef.current) {
                 videoRef.current.srcObject = stream
+                videoRef.current.onloadedmetadata = () => {
+                    videoRef.current?.play() // 确保视频开始播放
+                        .catch(error => {
+                            console.error('视频播放失败:', error)
+                            toast.error('相机启动失败，请重试')
+                        })
+                }
                 streamRef.current = stream
-                setShowCamera(true)
+                console.log('相机已启动') // 调试日志
+                toast.success('相机已启动')
                 startScanning()
             }
         } catch (err) {
@@ -649,17 +670,22 @@ function WaitingRoom() {
                     <DialogPanel className="w-full max-w-sm rounded-lg bg-white">
                         <div className="p-4">
                             <DialogTitle className="text-lg font-medium">相机扫码</DialogTitle>
-                            <div className="mt-4 aspect-square w-full relative">
+                            <div className="mt-4 aspect-[4/3] w-full relative bg-black">
                                 <video
                                     ref={videoRef}
                                     autoPlay
                                     playsInline
-                                    className="w-full h-full object-cover rounded"
+                                    muted
+                                    className="w-full h-full object-cover"
                                 />
+                                <div className="absolute inset-[15%] border-2 border-primary border-dashed rounded-lg pointer-events-none" />
+                                <div className="absolute top-0 left-0 right-0 text-center p-2 text-sm text-gray-500 bg-black/10">
+                                    将二维码对准框内
+                                </div>
                             </div>
                             <div className="mt-4 flex justify-between items-center">
                                 <div className="text-sm text-gray-500">
-                                    将二维码对准框内，自动识别
+                                    扫描中...
                                 </div>
                                 <Button onClick={stopCamera}>关闭相机</Button>
                             </div>
