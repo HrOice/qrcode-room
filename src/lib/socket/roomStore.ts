@@ -1,6 +1,6 @@
 // 用于操作Room的
 
-import { checkRoomOrCreate, deleteRooms, findAndDeleteRoom, updateAdminInfo } from '@/lib/service/RoomService';
+import { checkRoomOrCreate, deleteRooms, findAndDeleteRoom, senderCheckRoomOrCreate, updateAdminInfo, updateReceiverInfo } from '@/lib/service/RoomService';
 import { Room } from "@prisma/client";
 
 class RoomStatus {
@@ -154,6 +154,56 @@ export async function findInactiveRoom(): Promise<RoomStatus[]> {
     } catch (error) {
         console.error('查找不活跃房间失败:', error);
         return [];
+    }
+}
+
+/**
+ * 用户作为发送方，创建房间
+ * @param ip 
+ * @param cdkeyId 
+ * @param adminSocketId 
+ * @param adminId 
+ * @param timeout 
+ * @returns 
+ */
+export async function adminJoinCreateRoom(ip: string = '127.0.0.1', cdkeyId: number, adminSocketId: string, adminId: number, timeout: number) {
+    try {
+        const room = await senderCheckRoomOrCreate(ip, cdkeyId, adminSocketId);
+        let rs = null;
+        if (!roomCache.contains(room.id)) {
+            rs = new RoomStatus(room, timeout)
+            roomCache.setRoom(rs);
+        } else {
+            rs = roomCache.getRoom(room.id)
+            rs!.updateAdminActive()
+        }
+
+        return room;
+    } catch (error) {
+        console.error('user 加入房间失败:', error);
+        throw error;
+    }
+}
+
+export async function receiverJoinRoom(roomId: number, socketId: string) {
+    try {
+        const rs = roomCache.getRoom(roomId)
+        if (!rs) {
+            throw new Error('房间不存在');
+        }
+        // 先更新admin信息
+        const room = await updateReceiverInfo(roomId, socketId);
+        console.log('receiver join', room)
+        rs.updateRoom(room);
+        rs.updateClientActive()
+        if (!room) {
+            // 不存在
+            throw new Error('房间不存在');
+        }
+        return room;
+    } catch (error) {
+        console.error('管理员加入房间失败:', error);
+        throw error;
     }
 }
 

@@ -145,14 +145,14 @@ export default function RoomListPage() {
                             创建时间: {formatDate(room.createdAt)}
                         </div>
 
-                        <div className="flex gap-3 pt-2">
+                        {/* <div className="flex gap-3 pt-2">
                             <Button block type="primary" size="small" onClick={() => handleJoin(room.id)}>
                                 加入
                             </Button>
-                            {/*<Button block type="danger" size="small" onClick={() => handleDelete(room.id)}>*/}
-                            {/*    删除*/}
-                            {/*</Button>*/}
-                        </div>
+                            <Button block type="danger" size="small" onClick={() => handleDelete(room.id)}>
+                               删除
+                            </Button>
+                        </div> */}
                     </div>
                 ))}
             </div>

@@ -11,14 +11,16 @@ export class RoomSocket {
     private token: string
     private onDisconnected?: () => void
 
-    constructor(token: string, onDisconnected?: () => void) {
+    // user使用cdKey，学生不用
+    constructor(token: string,roomId?:number, onDisconnected?: () => void) {
         // 添加 auth 选项，socket.io-client 会自动携带 cookie
         this.token = token;
         this.onDisconnected = onDisconnected;
         this.socket = io({
             auth: {
-                token
-            }
+                token,
+                roomId,
+            },
         })
         this.setupListeners()
     }
@@ -54,6 +56,8 @@ export class RoomSocket {
         })
     }
 
+
+
     // 用户加入房间
     async joinRoom(onAdminJoin: () => void,
         onAdminReady: (ready: boolean) => void,
@@ -61,7 +65,7 @@ export class RoomSocket {
         onJoinRoom: (roomId: number, adminReady: boolean, adminOnline: boolean, used: number, total: number) => void,
         onReceiveImg: (data: string, used: number) => void,
         onStatus: () => { ready: boolean },
-        _onHeartBeat: (param: {roomId: number, ready: boolean, online: boolean}) => void
+        _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void
     ) {
         const ip = await getClientIp()
         console.log("joi room", ip)
@@ -76,7 +80,8 @@ export class RoomSocket {
             console.log('admin left ')
             onAdminLeft()
         })
-        this.socket.on('admin-send', (data, used, cb) => {debugger
+        this.socket.on('admin-send', (data, used, cb) => {
+            debugger
             onReceiveImg(data, used)
             cb()
         })
@@ -96,14 +101,58 @@ export class RoomSocket {
             })
     }
 
+    async receiverJoinRoom(
+        roomId: number,
+        onSenderJoin: () => void,
+        onSenderReady: (ready: boolean) => void,
+        onSenderLeft: () => void,
+        onJoinRoom: (roomId: number, senderReady: boolean, senderOnline: boolean, used: number, total: number) => void,
+        onReceiveImg: (data: string, used: number) => void,
+        onStatus: () => { ready: boolean },
+        _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void
+    ) {
+        // const ip = await getClientIp()
+        // console.log("joi room", ip)
+        this.socket.on('sender-join', () => {
+            // admin加入后，改变展示状态，显示准备
+            onSenderJoin()
+        })
+        // admin准备
+        this.socket.on('admin-ready', onSenderReady)
+        // admin离开 
+        this.socket.on('admin-left', () => {
+            console.log('admin left ')
+            onSenderLeft()
+        })
+        this.socket.on('admin-send', (data, used, cb) => {
+            debugger
+            onReceiveImg(data, used)
+            cb()
+        })
+        this.socket.on('status', (cb) => {
+            const status = onStatus()
+            console.log('onStatus', status)
+            cb(status)
+        })
+        // 加入房间
+        this.socket.emit('receiver-join', { ip:'null', key: this.token, roomId },
+            (response: { roomId: number, ready: boolean, online: boolean, used: number, total: number }) => {
+                const { roomId, ready, online, used, total } = response
+                this.roomId = roomId
+                onJoinRoom(this.roomId!, ready, online, used, total)
+                console.log('user join room', roomId)
+                this.startHeartbeat()
+            })
+    }
+
     // 管理员加入房间
     async adminJoin(roomId: number,
         onUserReady: (ready: boolean) => void,
         onUserLeft: () => void,
         onStatus: () => { ready: boolean },
         onJoinRoom: (roomId: number, clientReady: boolean, clientOnline: boolean) => void,
-        _onHeartBeat: (param: {roomId: number, ready: boolean, online: boolean}) => void,
-                    onUserJoin: () => void
+        _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void,
+        onUserJoin: () => void
     ) {
 
         this.socket.emit('admin-join', { roomId }, (response: { roomId: number, ready: boolean, online: boolean }) => {
@@ -115,6 +164,33 @@ export class RoomSocket {
             this.startHeartbeat()
         })
         this.socket.on('user-join', onUserJoin)
+        this.socket.on('user-ready', onUserReady)
+        this.socket.on('user-left', onUserLeft)
+        this.socket.on('status', (cb) => {
+            const status = onStatus()
+            cb(status)
+        })
+    }
+
+    // 管理员加入房间
+    async senderJoin(
+        onUserReady: (ready: boolean) => void,
+        onUserLeft: () => void,
+        onStatus: () => { ready: boolean },
+        onJoinRoom: (roomId: number, receiverReady: boolean, receiverOnline: boolean) => void,
+        _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void,
+        onUserJoin: () => void
+    ) {
+
+        this.socket.emit('sender-join', { ip: '127.0.0.1' }, (response: { roomId: number, ready: boolean, online: boolean }) => {
+
+            const { roomId, ready, online } = response
+            this.roomId = roomId
+            console.log('sender join room', response)
+            onJoinRoom(this.roomId!, ready, online)
+            this.startHeartbeat()
+        })
+        this.socket.on('receiver-join', onUserJoin)
         this.socket.on('user-ready', onUserReady)
         this.socket.on('user-left', onUserLeft)
         this.socket.on('status', (cb) => {

@@ -37,6 +37,9 @@ export default function RoomDetailPage() {
     const [leaveModalOpen, setLeaveModalOpen] = useState(false)
     const readyRef = useRef(false)  // 添加 ref 来跟踪最新状态'
     const [usedCount, setUsedCount ] = useState(0)
+    const [showCamera, setShowCamera] = useState(false)
+    const videoRef = useRef<HTMLVideoElement>(null)
+    const streamRef = useRef<MediaStream | null>(null)
     
     useEffect(() => {
         readyRef.current = isReady  // 当 ready 状态改变时更新 ref
@@ -192,6 +195,86 @@ export default function RoomDetailPage() {
         router.push('/admin/room')
     }
 
+    const startCamera = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment' } 
+          })
+          streamRef.current = stream
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream
+          }
+          setShowCamera(true)
+        } catch (err) {
+          console.error('相机启动失败:', err)
+          toast.error('无法访问相机')
+        }
+      }
+      
+      // 添加停止相机函数
+      const stopCamera = () => {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop())
+        }
+        setShowCamera(false)
+      }
+      
+      // 修改 scanQRCode 函数
+      const scanQRCode = () => {
+        if (!videoRef.current) return
+        
+        const canvas = document.createElement('canvas')
+        const context = canvas.getContext('2d')
+        if (!context) return
+      
+        canvas.width = videoRef.current.videoWidth
+        canvas.height = videoRef.current.videoHeight
+        
+        context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+        
+        try {
+          const code = jsQR(imageData.data, imageData.width, imageData.height)
+          if (code) {
+            setTextValue(code.data)
+            // 识别成功后自动生成二维码
+            QRCode.toDataURL(code.data).then(url => {
+              setQrCodeData({
+                url: url,
+                type: 'text'
+              })
+            })
+            toast.success('已识别二维码内容')
+            stopCamera()
+          }
+        } catch (error) {
+          console.error('扫描二维码出错:', error)
+        }
+      }
+      
+      // 在组件卸载时清理相机
+      useEffect(() => {
+        return () => {
+          stopCamera()
+        }
+      }, [])
+
+      // 添加定时扫描逻辑
+      useEffect(() => {
+        let scanInterval: NodeJS.Timer | null = null;
+        
+        if (showCamera && videoRef.current) {
+          // 每 500ms 扫描一次
+          scanInterval = setInterval(scanQRCode, 500);
+        }
+      
+        return () => {
+          if (scanInterval) {
+            clearInterval(scanInterval);
+          }
+        };
+      }, [showCamera]);
+
     if (!room) {
         return <div className="p-4 text-center">加载中...</div>
     }
@@ -282,6 +365,16 @@ export default function RoomDetailPage() {
                                     <div className="text-gray-400 text-sm text-center p-4">
                                         <div>点击上传二维码图片</div>
                                         <div className="mt-1">或输入文本自动生成</div>
+                                        <Button 
+                                            className="mt-2" 
+                                            size="small"
+                                            onClick={(e) => {
+                                                e.preventDefault()
+                                                startCamera()
+                                            }}
+                                        >
+                                            打开相机扫码
+                                        </Button>
                                     </div>
                                 </Uploader>
                             )}
@@ -364,6 +457,35 @@ export default function RoomDetailPage() {
                             </div>
                         </DialogPanel>
                     </div>
+                </div>
+            </Dialog>
+            {/* 修改相机对话框部分 */}
+            <Dialog 
+                open={showCamera} 
+                onClose={stopCamera}
+                className="relative z-50"
+            >
+                <div className="fixed inset-0 bg-black/30" />
+                <div className="fixed inset-0 flex items-center justify-center p-4">
+                    <DialogPanel className="w-full max-w-sm rounded-lg bg-white">
+                        <div className="p-4">
+                            <DialogTitle className="text-lg font-medium">相机扫码</DialogTitle>
+                            <div className="mt-4 aspect-square w-full relative">
+                                <video
+                                    ref={videoRef}
+                                    autoPlay
+                                    playsInline
+                                    className="w-full h-full object-cover rounded"
+                                />
+                            </div>
+                            <div className="mt-4 flex justify-between items-center">
+                                <div className="text-sm text-gray-500">
+                                    将二维码对准框内，自动识别
+                                </div>
+                                <Button onClick={stopCamera}>关闭相机</Button>
+                            </div>
+                        </div>
+                    </DialogPanel>
                 </div>
             </Dialog>
         </div>

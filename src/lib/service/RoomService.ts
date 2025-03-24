@@ -89,6 +89,17 @@ export async function updateAdminInfo(roomId: number, adminId: number, socketId:
     return room;
 }
 
+export async function updateReceiverInfo(roomId: number, socketId: string) {
+    const room = await prisma.room.update({
+        where: { id: roomId },
+        data: {
+            socketId,
+            status: 0
+        }
+    })
+    return room;
+}
+
 export async function findAndDeleteRoom(roomId: number) {
     const room = await prisma.room.findUnique({
         where: { id: roomId }
@@ -131,6 +142,35 @@ export async function checkRoomOrCreate(ip: string, cdkeyId: number, socketId: s
             data: {
                 lastActive: new Date(),
                 socketId
+            }
+        })
+    }
+    return room;
+}
+
+export async function senderCheckRoomOrCreate(ip: string, cdkeyId: number, adminSocketId: string) {
+    let room = await prisma.room.findFirst({
+        where: { ip, cdkeyId }
+    })
+    console.log('find room', room)
+
+    if (!room) {
+        console.log('room not exist ', ip, cdkeyId, adminSocketId)
+        room = await prisma.room.create({
+            data: {
+                ip,
+                cdkeyId,
+                lastActive: new Date(),
+                adminSocketId,
+            }
+        })
+    } else {
+        console.log('room exist ', ip, cdkeyId, adminSocketId, room.id)
+        room = await prisma.room.update({
+            where: { id: room.id },
+            data: {
+                lastActive: new Date(),
+                adminSocketId,
             }
         })
     }

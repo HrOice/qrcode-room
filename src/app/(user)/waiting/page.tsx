@@ -1,192 +1,453 @@
 'use client'
 
+import { roomApi, RoomDetail } from '@/lib/api/room'
 import { RoomSocket } from '@/lib/socket/client'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useRef, useState, Suspense } from 'react'
-import { Button, Image } from 'react-vant'
 
-// 创建一个包装组件来处理搜索参数
-function WaitingContent() {
+
+import { Jimp, ResizeStrategy } from 'jimp'
+import jsQR from 'jsqr'
+import QRCode from 'qrcode'
+
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
+import { Qr } from '@react-vant/icons'
+import Image from 'next/image'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import toast from 'react-hot-toast'
+import { Button, Input, Uploader, UploaderValueItem } from 'react-vant'
+
+
+
+export default function RoomDetailPage() {
     const router = useRouter()
+
+
     const searchParams = useSearchParams()
-    const [socket, setSocket] = useState<RoomSocket | null>(null)
-    const [reconnect, setReconnect] = useState(false)
+
+    const [room, setRoom] = useState<RoomDetail | null>(null)
+    const [isReady, setIsReady] = useState(false)
+    const [userReady, setUserReady] = useState(false)
+    const [userOnline, setUserOnline] = useState(false)
+    const [textValue, setTextValue] = useState('')
+    const [qrCodeData, setQrCodeData] = useState<{
+        url: string;
+        type: 'text' | 'image';
+    } | null>(null)
+    const [loading, setLoading] = useState(false)
+    const [reconnect, setReconnect] = useState(true)
     const [reconnectKey, setReconnectKey] = useState(0) // 添加重连计数器
-    const [adminJoin, setAdminJoin] = useState(false)
-    const [adminReady, setAdminReady] = useState(false)
-    const [roomId, setRoomId] = useState(0);
-    const [ready, setReady] = useState(false) // 添加用户准备状态
-    const readyRef = useRef(false)  // 添加 ref 来跟踪最新状态
-    const [imgSrc, setImgsrc] = useState('')
+    const [leaveModalOpen, setLeaveModalOpen] = useState(false)
+    const readyRef = useRef(false)  // 添加 ref 来跟踪最新状态'
     const [usedCount, setUsedCount] = useState(0)
-    const [totalCount, setTotalCount] = useState(0)
+    const [showCamera, setShowCamera] = useState(false)
+    const videoRef = useRef<HTMLVideoElement>(null)
+    const streamRef = useRef<MediaStream | null>(null)
+    const [roomId, setRoomId] = useState(0)
+    const [showRoomQR, setShowRoomQR] = useState(false)
+    const [roomQRCode, setRoomQRCode] = useState('')
+    const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
     useEffect(() => {
-        readyRef.current = ready  // 当 ready 状态改变时更新 ref
-    }, [ready])
-
-
+        readyRef.current = isReady  // 当 ready 状态改变时更新 ref
+    }, [isReady])
+    // 获取房间详情
+    const fetchRoomDetail = useCallback(async () => {
+        const { room } = await roomApi.getRoom(roomId)
+        if (!room) {
+            return;
+        }
+        setRoom(room)
+        setUsedCount(room.cdkey.used)
+    }, [roomId])
+    // 添加清空函数
+    const handleClear = () => {
+        setQrCodeData(null)
+        setTextValue('')
+    }
+    // 添加复制函数
+    const copyToClipboard = async (text: string) => {
+        try {
+            await navigator.clipboard.writeText(text)
+            toast.success('链接已复制')
+        } catch (err) {
+            console.error('复制失败:', err)
+            toast.error('复制失败')
+        }
+    }
+    // 使用 useRef 确保 socket 实例只初始化一次
+    const roomSocketRef = useRef<RoomSocket | null>(null)
+    // 初始化 Socket 连接
     useEffect(() => {
         const key = searchParams.get('key')
         if (!key) {
             router.push('/login')
             return
         }
+        if (!roomSocketRef.current) {
+            console.log('new ref admin', roomId)
+            const roomSocket = new RoomSocket(key, undefined, () => {
+                setReconnect(true);
+            })
 
-        const roomSocket = new RoomSocket(key, () => {
-            setReconnect(true)
-        })
-        setReconnect(false)
-        roomSocket.joinRoom(() => {
-            setAdminJoin(true)
-        }, (ready) => {
-            setAdminReady(ready)
-        }, () => {
-            setAdminJoin(false)
-            setAdminReady(false)
-            setReady(false)
-        }, (id, ready, online, used, total) => {
-            setRoomId(id)
-            setAdminJoin(online)
-            setAdminReady(ready)
-            setTotalCount(total)
-            setUsedCount(used)
-        }, (data, used) => {
-            setImgsrc(data)
-            setUsedCount(used)
-        }, () => {
-            const currentReady = readyRef.current;  // 记录当前状态以便调试
-            console.log('Status check, current ready state:', currentReady);
-            return {
-                ready: currentReady,
-            }
-        }, (param) => {
-            const {online, ready} = param
-            setAdminJoin(online)
-            setAdminReady(ready)
-        })
-        setSocket(roomSocket)
+            roomSocketRef.current = roomSocket
+            setReconnect(false)
+            roomSocket.senderJoin(
+                () => {
+                    setUserReady(true)
+                },
+                () => {
+                    toast.success('用户已离开房间')
+                    setUserReady(false)
+                    setUserOnline(false)
+                },
+                () => {
+                    return {
+                        ready: readyRef.current,
+                    }
+                },
+                (roomId, ready, online) => {
+                    debugger
+                    setRoomId(roomId)
+                    // 获取房间详情
+                    fetchRoomDetail()
+                    setUserReady(ready);
+                    setUserOnline(online)
+                }, (param) => {
+                    const { online, ready } = param
+                    setUserOnline(online)
+                    setUserReady(ready)
+                }, () => {
+                    setUserOnline(true)
+                    setUserReady(false)
+                    setIsReady(false)
+                }
+            )
+
+        }
+
+
 
         return () => {
-            roomSocket.clientDisconnect()
+            // 清理 socket 连接
+            if (roomSocketRef.current) {
+                roomSocketRef.current!.adminDisconnect()
+                roomSocketRef.current = null
+            }
         }
-    }, [searchParams, router, reconnectKey]) // 添加 reconnectKey 到依赖数组
+    }, [roomId, router, fetchRoomDetail, reconnectKey])
 
-    // 处理准备按钮点击
+    // 处理准备状态
     const handleReady = () => {
-        if (!socket) return
-        const r = !ready;
-        socket.userReady(r, (re) => {
-            console.log('user ready', ready, re)
-            setReady(re)
-            console.log('user ready1', ready, re)
-
+        if (!roomSocketRef.current) return
+        const r = !isReady;
+        roomSocketRef.current!.adminReady(r, (re) => {
+            setIsReady(re)
         })
     }
 
+    // 处理文本转二维码
+    const handleTextChange = async (text: string) => {
+        try {
+            setTextValue(text)
+            if (text) {
+                const qrDataUrl = await QRCode.toDataURL(text)
+                setQrCodeData({
+                    url: qrDataUrl,
+                    type: 'text'
+                })
+            } else {
+                setQrCodeData(null)
+            }
+        } catch (error) {
+            console.error(error)
+            toast.error('生成二维码失败')
+        }
+    }
+
+    // 处理图片上传和二维码识别
+    const handleImageUpload = async (items: UploaderValueItem[]) => {
+        try {
+            if (items.length > 0) {
+                setQrCodeData({
+                    url: items[0].url!,
+                    type: 'image'
+                })
+    
+                // 使用 Jimp 处理图片
+                const image = await Jimp.read(items[0].url!)
+                
+                // 可以添加图片预处理以提高识别率
+                image
+                    .normalize() // 标准化像素值
+                    .contrast(0.2) // 增加对比度
+                    .resize({w:800, mode:ResizeStrategy.BILINEAR}) // 调整大小但保持比例
+                
+                const { width, height } = image.bitmap
+                const imageData = new Uint8ClampedArray(image.bitmap.data)
+    
+                // 使用增强的配置进行识别
+                const code = jsQR(imageData, width, height, {
+                    inversionAttempts: "attemptBoth", // 尝试黑白两种模式
+
+                })
+    
+                if (code) {
+                    setTextValue(code.data)
+                    toast.success('已识别二维码内容')
+                } else {
+                    toast.error('未检测到二维码，请尝试调整图片亮度或对比度')
+                }
+            }
+        } catch (error) {
+            console.error('识别二维码失败:', error)
+            toast.error('识别失败，请确保上传的是清晰的二维码图片')
+        }
+    }
+
+    // 处理提交
+    const handleSubmit = async () => {
+        if (!roomSocketRef.current || !qrCodeData) return
+        setLoading(true)
+        try {
+            roomSocketRef.current!.adminSend(qrCodeData.url, (used) => {
+                toast.success(used > 0 ? '提交成功' : '没有次数')
+                if (used > 0) { setUsedCount(used) }
+            })
+        } catch (error) {
+            console.error(error)
+            toast.error('提交失败')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // 处理离开房间
     const handleLeave = () => {
-        if (!socket) return
-        socket.clientLeaveRoom()
-        router.replace("/login")
+
+        if (roomSocketRef.current) {
+            roomSocketRef.current?.adminLeaveRoom()
+        }
+        router.push('/admin/room')
+    }
+
+    const startCamera = async () => {
+        try {
+            // 检查浏览器是否支持 mediaDevices
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                // 尝试使用老版本的 API
+                const getUserMedia = navigator.getUserMedia ||
+                    navigator.webkitGetUserMedia ||
+                    navigator.mozGetUserMedia ||
+                    navigator.msGetUserMedia;
+
+                if (!getUserMedia) {
+                    // throw new Error('您的浏览器不支持访问相机，请使用最新版本的Chrome/Firefox/Safari')
+                } else {
+                    // 使用老版本 API
+                    getUserMedia.call(navigator,
+                        { video: { facingMode: 'environment' } },
+                        (stream) => {
+                            if (videoRef.current) {
+                                videoRef.current.srcObject = stream
+                                streamRef.current = stream
+                                setShowCamera(true)
+                                startScanning()
+                            }
+                        },
+                        (error) => {
+                            throw error
+                        }
+                    )
+                    return
+                }
+
+            }
+
+            // 使用现代 API
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            })
+
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream
+                streamRef.current = stream
+                setShowCamera(true)
+                startScanning()
+            }
+        } catch (err) {
+            console.error('相机启动失败:', err)
+            let errorMessage = '无法访问相机'
+
+            // 根据具体错误类型显示不同提示
+            if (err instanceof Error) {
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    errorMessage = '请允许访问相机权限'
+                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                    errorMessage = '未找到可用的相机设备'
+                } else if (err.name === 'NotSupportedError') {
+                    errorMessage = '您的浏览器不支持访问相机'
+                } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                    errorMessage = '相机设备被占用或无法访问'
+                }
+            }
+
+            toast.error(errorMessage + err)
+        }
+    }
+
+    // 添加开始扫描函数
+    const startScanning = () => {
+        // 每 200ms 扫描一次
+        const interval = setInterval(scanQRCode, 200)
+        // 保存 interval id 以便清理
+        scanIntervalRef.current = interval
+    }
+
+    // 修改 scanQRCode 函数
+    const scanQRCode = () => {
+        if (!videoRef.current || !videoRef.current.videoWidth) return
+
+        const canvas = document.createElement('canvas')
+        const context = canvas.getContext('2d')
+        if (!context) return
+
+        // 使用实际视频尺寸
+        const { videoWidth, videoHeight } = videoRef.current
+        canvas.width = videoWidth
+        canvas.height = videoHeight
+
+        // 绘制当前视频帧
+        context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight)
+
+        // 获取图像数据
+        const imageData = context.getImageData(0, 0, videoWidth, videoHeight)
+
+        try {
+            // 增加容错处理
+            const code = jsQR(
+                imageData.data,
+                imageData.width,
+                imageData.height,
+                {
+                    inversionAttempts: "dontInvert", // 提高识别速度
+                }
+            )
+
+            if (code) {
+                console.log('识别到二维码:', code.data) // 调试用
+
+                // 验证二维码数据是否有效
+                if (code.data && code.data.trim()) {
+                    // 识别成功后的处理
+                    setTextValue(code.data)
+                    QRCode.toDataURL(code.data).then(url => {
+                        setQrCodeData({
+                            url: url,
+                            type: 'text'
+                        })
+                        toast.success('已识别二维码')
+                        stopCamera()  // 识别成功后关闭相机
+                    })
+                }
+            }
+        } catch (error) {
+            console.error('扫描二维码出错:', error)
+        }
+    }
+
+
+    // 修改停止相机函数
+    const stopCamera = () => {
+        // 清理扫描定时器
+        if (scanIntervalRef.current) {
+            clearInterval(scanIntervalRef.current)
+            scanIntervalRef.current = null
+        }
+
+        // 停止视频流
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop())
+            streamRef.current = null
+        }
+
+        setShowCamera(false)
+    }
+
+    // 在组件卸载时清理相机
+    useEffect(() => {
+        return () => {
+            stopCamera()
+        }
+    }, [])
+
+    // 添加定时扫描逻辑
+    useEffect(() => {
+        let scanInterval: NodeJS.Timer | null = null;
+
+        if (showCamera && videoRef.current) {
+            // 每 500ms 扫描一次
+            scanInterval = setInterval(scanQRCode, 500);
+        }
+
+        return () => {
+            if (scanInterval) {
+                clearInterval(scanInterval as NodeJS.Timeout);
+            }
+        };
+    }, [showCamera]);
+
+    const generateRoomQR = useCallback(async () => {
+        if (!room) return
+        const url = `${window.location.origin}/to/${room.id}`
+        try {
+            const qrDataUrl = await QRCode.toDataURL(url)
+            setRoomQRCode(qrDataUrl)
+        } catch (error) {
+            console.error(error)
+            toast.error('生成房间二维码失败')
+        }
+    }, [room])
+
+    if (!room) {
+        return <div className="p-4 text-center">加载中...</div>
     }
 
     return (
-        <div className="p-4 space-y-4">
-            {/* 房间基本信息 */}
-            <div className="bg-white rounded-lg p-4">
-                <div className="space-y-2">
-                    <div className="text-sm text-gray-500">房间号</div>
-                    <div className="font-mono text-lg">{roomId}</div>
+        <div className="max-w-2xl p-4 space-y-6">
+            {/* 房间信息 */}
+            <div className="bg-white rounded-lg p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-lg font-medium">房间 #{room.id}</h2>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            size="small"
+                            icon={<Qr />}
+                            onClick={() => {
+                                generateRoomQR()
+                                setShowRoomQR(true)
+                            }}
+                        >
+                            房间码
+                        </Button>
+                        {/* <span className="text-gray-500">
+                            创建于 {formatDate(room.createdAt)}
+                        </span> */}
+                    </div>
                 </div>
-                <div className="mt-2 space-y-2">
+                <div className="space-y-2">
                     <div className="text-sm text-gray-500">CDKey</div>
                     <div className="font-mono bg-gray-50 p-2 rounded">
-                        {searchParams.get('key')}
+                        {room.cdkey.key}
                     </div>
-                    <div className="text-sm text-gray-500 flex justify-between items-center">
-                    <span>使用次数:</span>
-                    <span className={usedCount >= totalCount ? 'text-red-500' : 'text-green-500'}>
-                        {usedCount}/{totalCount}
-                    </span>
                 </div>
+                <div className="text-sm text-gray-600">
+                    剩余使用次数: {room.cdkey.total - usedCount}/{room.cdkey.total}
                 </div>
             </div>
-
-            {/* 根据不同状态显示不同内容 */}
-            {!reconnect && (
-                <>
-                    {!adminJoin ? (
-                        // 等待管理员加入状态
-                        <div className="text-center space-y-4">
-                            <div className="text-lg">等待管理员接入...</div>
-                            <div className="animate-pulse text-gray-500">
-                                请保持页面打开
-                            </div>
-                        </div>
-                    ) : (
-                        // 管理员已加入状态
-                        <div className="space-y-4">
-                            {/* 二维码展示区域 */}
-                            <div className="bg-white rounded-lg p-4">
-                                <div className="aspect-square w-full max-w-sm mx-auto border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center">
-                                    {!adminReady ? (
-                                        <div className="text-gray-400">
-                                            等待管理员准备...
-                                        </div>
-                                    ) : imgSrc ? (
-                                        <Image
-                                            src={imgSrc}
-                                            alt="QR Code"
-                                            className="w-full h-full object-contain p-4"
-                                        />
-                                    ) : (
-                                        <div className="text-gray-400">
-                                            等待管理员发送...
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* 准备状态区域 */}
-                            <div className="bg-white rounded-lg p-4 space-y-4">
-                                <div className="flex justify-between items-center">
-                                    <div className="space-y-2">
-                                        <div>
-                                            管理员状态：
-                                            <span className={adminReady ? 'text-green-600' : 'text-yellow-600'}>
-                                                {adminReady ? '已准备' : '未准备'}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            用户状态：
-                                            <span className={ready ? 'text-green-600' : 'text-yellow-600'}>
-                                                {ready ? '已准备' : '未准备'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        type={ready ? 'info' : 'primary'}
-                                        disabled={ready || !adminReady}
-                                        onClick={handleReady}
-                                    >
-                                        {ready ? '已准备' : '准备'}
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 离开按钮 */}
-                    <Button
-                        block
-                        type="danger"
-                        onClick={handleLeave}
-                    >
-                        离开房间
-                    </Button>
-                </>
-            )}
-
             {/* 重连按钮 */}
             {reconnect && (
                 <Button
@@ -199,19 +460,230 @@ function WaitingContent() {
                     重新连接
                 </Button>
             )}
-        </div>
-    )
-}
 
-// 主组件使用 Suspense 包装
-export default function WaitingPage() {
-    return (
-        <Suspense fallback={
-            <div className="p-4 text-center">
-                <div className="text-lg">加载中...</div>
-            </div>
-        }>
-            <WaitingContent />
-        </Suspense>
-    )
+            {/* 操作区域 */}
+            {!reconnect && isReady && userReady && (
+                <div className="bg-white rounded-lg p-4 space-y-4">
+                    {/* 文本输入 */}
+                    <Input.TextArea
+                        value={textValue}
+                        onChange={handleTextChange}
+                        placeholder="输入文本自动生成二维码"
+                        rows={4}
+                    />
+
+                    {/* 合并的图片上传和预览区域 */}
+                    <div className="space-y-4">  {/* 修改 space-y-2 为 space-y-4 增加间距 */}
+                        <div className="text-sm text-gray-500">
+                            {qrCodeData?.type === 'text' ? '生成的二维码' : '上传二维码图片自动识别内容'}
+                        </div>
+                        <div className="aspect-square w-full max-w-sm mx-auto border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center relative">
+                            {qrCodeData ? (
+                                // 预览区域
+                                <div className="relative group w-full h-full">
+                                    <Image
+                                        src={qrCodeData.url}
+                                        width="100"
+                                        height="100"
+                                        alt="QR Code"
+                                        className="w-full h-full object-contain p-4"
+                                    />
+                                    {/* 悬停时显示的上传覆盖层 */}
+                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <Uploader
+                                            value={qrCodeData?.type === 'image' ? [{ url: qrCodeData.url }] : []}
+                                            onChange={handleImageUpload}
+                                            multiple={false}
+                                            maxCount={1}
+                                            className="!block"
+                                        >
+                                            <div className="text-white text-sm">
+                                                点击更换图片
+                                            </div>
+                                        </Uploader>
+                                        <Button
+                                            size="small"
+                                            type="danger"
+                                            onClick={handleClear}
+                                        >
+                                            清空内容
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                // 初始上传区域
+                                <Uploader
+                                    value={[]}
+                                    onChange={handleImageUpload}
+                                    multiple={false}
+                                    maxCount={1}
+                                >
+                                    <div className="text-gray-400 text-sm text-center p-4">
+                                        <div>点击上传二维码图片</div>
+                                        <div className="mt-1">或输入文本自动生成</div>
+                                    </div>
+                                </Uploader>
+                            )}
+                        </div>
+                        {/* 将扫码按钮移到这里 */}
+                        <div className="flex justify-center">
+                            <Button
+                                icon={<Qr />}
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    startCamera()
+                                }}
+                            >
+                                打开相机扫码
+                            </Button>
+                        </div>
+                    </div>
+
+                    <Button
+                        block
+                        type="primary"
+                        loading={loading}
+                        disabled={!qrCodeData}
+                        onClick={handleSubmit}
+                    >
+                        发送给用户
+                    </Button>
+                </div>
+            )}
+
+            {/* 准备状态 */}
+            {!reconnect && (
+                <div className="bg-white rounded-lg p-4 space-y-4">
+                    <div className="flex justify-between items-center">
+                        <div className="space-y-2">
+                            <div>
+                                用户状态:
+                                <span className={`ml-2 ${userOnline ? 'text-green-600' : 'text-red-600'}`}>
+                                    {userOnline ? '在线' : '离线'}
+                                </span>
+                                {userOnline && (
+                                    <span className={`ml-2 ${userReady ? 'text-green-600' : 'text-yellow-600'}`}>
+                                        {userReady ? '已准备' : '未准备'}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <Button
+                            type={isReady ? 'info' : 'primary'}
+                            disabled={isReady || !userOnline} // 用户不在线时禁用准备按钮
+                            onClick={handleReady}
+                        >
+                            {isReady ? '已准备' : '准备'}
+                        </Button>
+                    </div>
+                </div>)}
+
+            {/* 离开按钮 */}
+            <Button block type="danger" onClick={() => setLeaveModalOpen(true)}>
+                离开房间
+            </Button>
+            <Dialog open={leaveModalOpen} as="div" className="relative z-10 focus:outline-none" onClose={() => {
+                setLeaveModalOpen(false)
+            }}>
+                <div className="fixed inset-0 z-10 w-screen overflow-y-auto">
+                    <div className="flex min-h-full items-center justify-center p-4">
+                        <DialogPanel
+                            transition
+                            className="w-full max-w-md rounded-xl bg-gray-500 p-6"
+                        >
+                            <DialogTitle as="h3" className="text-base/7 font-medium text-white">
+                                确认离开
+                            </DialogTitle>
+                            <p className="mt-2 text-sm/6 text-white/50">
+                                离开后可重新加入，或者分配其他人处理
+                            </p>
+                            <div className="mt-4 flex w-full flex-row-reverse">
+                                <Button
+                                    type='primary'
+                                    className='flex-1 mx-1'
+                                    onClick={handleLeave}
+                                >
+                                    离开
+                                </Button>
+                                <div className='w-2'></div>
+                                <Button
+                                    className='flex-1 mx-1.5'
+                                    onClick={() => setLeaveModalOpen(false)}
+                                >
+                                    取消
+                                </Button>
+                            </div>
+                        </DialogPanel>
+                    </div>
+                </div>
+            </Dialog>
+            {/* 修改相机对话框部分 */}
+            <Dialog
+                open={showCamera}
+                onClose={stopCamera}
+                className="relative z-50"
+            >
+                <div className="fixed inset-0 bg-black/30" />
+                <div className="fixed inset-0 flex items-center justify-center p-4">
+                    <DialogPanel className="w-full max-w-sm rounded-lg bg-white">
+                        <div className="p-4">
+                            <DialogTitle className="text-lg font-medium">相机扫码</DialogTitle>
+                            <div className="mt-4 aspect-square w-full relative">
+                                <video
+                                    ref={videoRef}
+                                    autoPlay
+                                    playsInline
+                                    className="w-full h-full object-cover rounded"
+                                />
+                            </div>
+                            <div className="mt-4 flex justify-between items-center">
+                                <div className="text-sm text-gray-500">
+                                    将二维码对准框内，自动识别
+                                </div>
+                                <Button onClick={stopCamera}>关闭相机</Button>
+                            </div>
+                        </div>
+                    </DialogPanel>
+                </div>
+            </Dialog>
+            {/* 在最后添加房间二维码对话框 */}
+            <Dialog
+                open={showRoomQR}
+                onClose={() => setShowRoomQR(false)}
+                className="relative z-50"
+            >
+                <div className="fixed inset-0 bg-black/30" />
+                <div className="fixed inset-0 flex items-center justify-center p-4">
+                    <DialogPanel className="w-full max-w-sm rounded-lg bg-white">
+                        <div className="p-4">
+                            <DialogTitle className="text-lg font-medium">房间二维码</DialogTitle>
+                            <div className="mt-4 aspect-square w-full relative flex flex-col items-center">
+                                {roomQRCode && (
+                                    <Image
+                                        src={roomQRCode}
+                                        width={200}
+                                        height={200}
+                                        alt="Room QR Code"
+                                        className="w-48 h-48 object-contain"
+                                    />
+                                )}
+                                <div className="mt-4 flex items-center gap-2 px-4">
+                                    <div className="text-sm text-gray-500 break-all flex-1">
+                                        {`${window.location.origin}/to/${room.id}`}
+                                    </div>
+                                    <Button
+                                        size="small"
+                                        onClick={() => copyToClipboard(`${window.location.origin}/to/${room.id}`)}
+                                    >
+                                        复制
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="mt-4 flex justify-end">
+                                <Button onClick={() => setShowRoomQR(false)}>关闭</Button>
+                            </div>
+                        </div>
+                    </DialogPanel>
+                </div>
+            </Dialog></div>)
 }

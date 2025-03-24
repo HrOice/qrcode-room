@@ -2,8 +2,8 @@
 import { Server, Socket } from 'socket.io';
 import { useCDKey, validCDKey } from '../service/CDkeyService';
 import { cleanUnactiveRoom } from '../service/RoomService';
-import { jwtUtils } from '../utils/jwtUtils';
-import { adminJoinRoom, clientJoinRoom, clientLeaveRoom, deleteRoom, findInactiveRoom, getRoom, heartBeat, roomCache } from './roomStore';
+
+import { adminJoinCreateRoom, adminJoinRoom, clientJoinRoom, clientLeaveRoom, deleteRoom, findInactiveRoom, getRoom, heartBeat, receiverJoinRoom, roomCache } from './roomStore';
 interface StatusResponse {
   online: boolean;
   ready: boolean;
@@ -53,22 +53,17 @@ export function createSocketServer(server: any) {
   // 添加身份验证中间件
   io.use(async (socket, next) => {
     const token = socket.handshake.auth.token
+    const roomId = socket.handshake.auth.roomId
     if (!token) {
       return next(new Error('unauthorized'))
     }
 
     try {
-      if (token.includes('.')) {
-        console.log('admin-auth ', token)
-        const payload = await jwtUtils.verify(token)
-        console.log('admin-auth ', token, payload)
-        if (!payload) {
-          return next(new Error('admin.unauthorized'))
-        }
-
+      if (token === 'student') {
         // 将用户信息添加到请求头中
-        socket.data.adminId = payload.id
-        socket.data.role = 'admin'
+        socket.data.adminId = -1
+        socket.data.role = 'client'
+        socket.data.roomId = roomId
       } else {
         // 验证 valid_key
         const { id, key, valid, used, total } = await validCDKey(token);
@@ -79,7 +74,7 @@ export function createSocketServer(server: any) {
 
         // 将验证信息保存到 socket 实例中
         socket.data.record = { id, key }
-        socket.data.role = 'client'
+        socket.data.role = 'admin'
         socket.data.keyId = id
         socket.data.key = key
         socket.data.used = used
@@ -132,6 +127,49 @@ export function createSocketServer(server: any) {
     
       return checkStatus(socket, roomId, () => room.isClientOnline());
     }
+
+    // 发送方创建房间
+    socket.on('sender-join', async ({ip}, cb) => {
+      console.log('sender-join', socket.data, ip)
+      const cdkeyId = socket.data.keyId;
+      socket.data.ip = ip
+
+      try {
+        const room = await adminJoinCreateRoom(ip, cdkeyId, socket.id,-1, TIMEOUT_MS)
+        socket.data.roomId = room.id
+        socket.join(String(room.id))
+        console.log('sender-join cb', room.id, cb)
+        socket.to(String(room.id)).emit('sender-join', {roomId: room.id})
+        // 要检查admin的状态，是否在线，是否准备
+        const clientStatus = await checkClientStatus()
+        cb({roomId: room.id, ...clientStatus, used: socket.data.used, total: socket.data.total})
+      } catch (error) {
+        console.error(error)
+        socket.emit('error', { message: 'sender加入房间失败' })
+      }
+    })
+
+    // 接收方创建房间
+    // 管理员加入房间
+    socket.on('receiver-join', async ({ roomId },cb) => {
+      try {
+
+        socket.data.roomId = roomId
+        console.log('receiver-join', roomId);
+        const {cdkeyId, ip} = await receiverJoinRoom(roomId, socket.id);
+        socket.data.keyId = cdkeyId
+        socket.data.senderIp = ip
+
+        socket.join(String(roomId))
+        socket.to(String(roomId)).emit('receiver-join', {roomId})
+        const adminStatus = await checkAdminStatus()
+        console.log('receiver-join', roomId, adminStatus);
+        cb({roomId: roomId, ...adminStatus})
+      } catch (error) {
+        console.error(error)
+        socket.emit('error', { message: 'receiver加入房间失败' })
+      }
+    })
 
     // 用户创建/重连房间
     socket.on('join-room', async ({ ip }, cb) => {
@@ -211,7 +249,7 @@ export function createSocketServer(server: any) {
       socket.to(String(roomId)).emit('admin-send', data, used! + 1, async () => {
         // 发送成功减次数
         console.log('send success........', roomId, cb);
-        const used = await useCDKey(socket.data.keyId, socket.data.clientIp, socket.data.adminId)
+        const used = await useCDKey(socket.data.keyId, socket.data.ip, socket.data.adminId)
         cb(used)
       })
     })
