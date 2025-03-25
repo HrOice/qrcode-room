@@ -254,7 +254,7 @@ function WaitingRoom() {
         if (roomSocketRef.current) {
             roomSocketRef.current?.adminLeaveRoom()
         }
-        router.push('/admin/room')
+        router.push('/login')
     }
 
     const startCamera = async () => {
@@ -609,7 +609,7 @@ function WaitingRoom() {
                                 确认离开
                             </DialogTitle>
                             <p className="mt-2 text-sm/6 text-white/50">
-                                离开后可重新加入，或者分配其他人处理
+                                离开后可重新加入
                             </p>
                             <div className="mt-4 flex w-full flex-row-reverse">
                                 <Button
