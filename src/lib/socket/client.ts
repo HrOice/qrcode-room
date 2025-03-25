@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
+import toast from 'react-hot-toast'
 import { io, Socket } from 'socket.io-client'
 import { getClientIp } from '../utils/getClientIp'
 import { SocketEmitter } from './socketUtil'
@@ -46,6 +47,7 @@ export class RoomSocket {
                 window.location.href = '/admin/login'
             } else {
                 console.error('uncaught error', error)
+                toast.error(error?.message||'加入失败')
                 this.socket.disconnect()
                 this.onDisconnected?.()
             }
@@ -53,6 +55,7 @@ export class RoomSocket {
 
         this.socket.on('error', (error) => {
             console.error('Socket error:', error)
+            toast.error(error?.message || '连接失败')
         })
     }
 

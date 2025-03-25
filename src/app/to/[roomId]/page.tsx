@@ -4,6 +4,7 @@
 import { RoomSocket } from '@/lib/socket/client'
 import { useParams, useRouter } from 'next/navigation'
 import { Suspense, useEffect, useRef, useState } from 'react'
+import { Toaster } from 'react-hot-toast'
 import { Button, Image } from 'react-vant'
 
 // 接收方
@@ -118,7 +119,7 @@ function WaitingContent() {
                     {!adminJoin ? (
                         // 等待管理员加入状态
                         <div className="text-center space-y-4">
-                            <div className="text-lg">等待管理员接入...</div>
+                            <div className="text-lg">等待发送者接入...</div>
                             <div className="animate-pulse text-gray-500">
                                 请保持页面打开
                             </div>
@@ -131,7 +132,7 @@ function WaitingContent() {
                                 <div className="aspect-square w-full max-w-sm mx-auto border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center">
                                     {!adminReady ? (
                                         <div className="text-gray-400">
-                                            等待管理员准备...
+                                            等待发送者准备...
                                         </div>
                                     ) : imgSrc ? (
                                         <Image
@@ -141,7 +142,7 @@ function WaitingContent() {
                                         />
                                     ) : (
                                         <div className="text-gray-400">
-                                            等待管理员发送...
+                                            等待发送者发送...
                                         </div>
                                     )}
                                 </div>
@@ -152,7 +153,7 @@ function WaitingContent() {
                                 <div className="flex justify-between items-center">
                                     <div className="space-y-2">
                                         <div>
-                                            管理员状态：
+                                            发送者状态：
                                             <span className={adminReady ? 'text-green-600' : 'text-yellow-600'}>
                                                 {adminReady ? '已准备' : '未准备'}
                                             </span>
@@ -212,6 +213,8 @@ export default function WaitingPage() {
             </div>
         }>
             <WaitingContent />
+            <Toaster position="top-center" />
+
         </Suspense>
     )
 }

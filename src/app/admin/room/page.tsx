@@ -2,17 +2,23 @@
 
 import { roomApi, type Room } from '@/lib/api/room';
 import { formatDate } from '@/lib/utils/dateFormat';
-import { Search } from '@react-vant/icons';
+import { Qr, Search } from '@react-vant/icons';
+import Image from 'next/image';
+import QRCode from 'qrcode';
+import { toast } from 'react-hot-toast';
 
-import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/navigation';
+import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Dialog, Input } from 'react-vant';
+import { Button, Input } from 'react-vant';
 
 export default function RoomListPage() {
-    const router = useRouter()
+    // const router = useRouter()
     const [rooms, setRooms] = useState<Room[]>([])
     const [loading, setLoading] = useState(false)
     const [searchId, setSearchId] = useState('')
+    const [showQR, setShowQR] = useState(false)
+    const [currentRoomQR, setCurrentRoomQR] = useState<{ id: number, qr: string }>()
 
     // 获取房间列表
     const fetchRooms = useCallback(async () => {
@@ -31,31 +37,58 @@ export default function RoomListPage() {
 
 
     // 加入房间
-    const handleJoin = async (roomId: number) => {
+    // const handleJoin = async (roomId: number) => {
+    //     try {
+    //         // 跳转到房间页面
+    //         router.push(`/admin/room/${roomId}`)
+    //     } catch (error) {
+    //         console.error('加入房间失败:', error)
+    //     }
+    // }
+
+    // // 删除房间
+    // const handleDelete = async (roomId: number) => {
+    //     Dialog.confirm({
+    //         title: '确认删除',
+    //         message: '确定要删除这个房间吗？',
+    //         onConfirm: async () => {
+    //             try {
+    //                 await roomApi.deleteRoom(roomId)
+    //                 fetchRooms()
+    //             } catch (error) {
+    //                 console.error('删除房间失败:', error)
+    //             }
+    //         }
+    //     })
+    // }
+
+    // 生成和显示二维码
+    const handleShowQR = async (roomId: number) => {
         try {
-            // 跳转到房间页面
-            router.push(`/admin/room/${roomId}`)
+            const url = `${window.location.origin}/to/${roomId}`
+            const qrDataUrl = await QRCode.toDataURL(url, {
+                width: 200,
+                margin: 1
+            })
+            setCurrentRoomQR({ id: roomId, qr: qrDataUrl })
+            setShowQR(true)
         } catch (error) {
-            console.error('加入房间失败:', error)
+            console.error('生成二维码失败:', error)
+            toast.error('生成二维码失败')
         }
     }
 
-    // 删除房间
-    const handleDelete = async (roomId: number) => {
-        Dialog.confirm({
-            title: '确认删除',
-            message: '确定要删除这个房间吗？',
-            onConfirm: async () => {
-                try {
-                    await roomApi.deleteRoom(roomId)
-                    fetchRooms()
-                } catch (error) {
-                    console.error('删除房间失败:', error)
-                }
-            }
-        })
+    // 复制链接
+    const copyRoomLink = async (roomId: number) => {
+        const url = `${window.location.origin}/to/${roomId}`
+        try {
+            await navigator.clipboard.writeText(url)
+            toast.success('链接已复制')
+        } catch (err) {
+            console.error('复制失败:', err)
+            toast.error('复制失败')
+        }
     }
-
 
     useEffect(() => {
         fetchRooms()
@@ -82,7 +115,7 @@ export default function RoomListPage() {
                 <div className="grid grid-cols-5 gap-4 p-4 bg-gray-50 text-gray-600 font-medium text-sm">
                     <div>房间ID</div>
                     <div>CDKey</div>
-                    <div>状态</div>
+                    {/* <div>状态</div> */}
                     <div>创建时间</div>
                     <div>操作</div>
                 </div>
@@ -94,7 +127,7 @@ export default function RoomListPage() {
                             <div className="font-mono text-sm truncate">
                                 {room.cdkey.key}
                             </div>
-                            <div>
+                            {/* <div>
                                 <span className={`px-2 py-1 rounded text-sm ${
                                     room.status === 1
                                         ? 'bg-green-50 text-green-600'
@@ -102,17 +135,24 @@ export default function RoomListPage() {
                                 }`}>
                                     {room.status === 1 ? '已连接' : '等待加入'}
                                 </span>
-                            </div>
+                            </div> */}
                             <div className="text-gray-600 text-sm">
                                 {formatDate(room.createdAt)}
                             </div>
                             <div className="space-x-2">
-                                <Button size="small" type="primary" onClick={() => handleJoin(room.id)}>
+                                <Button
+                                    size="small"
+                                    icon={<Qr />}
+                                    onClick={() => handleShowQR(room.id)}
+                                >
+                                    房间码
+                                </Button>
+                                {/* <Button size="small" type="primary" onClick={() => handleJoin(room.id)}>
                                     加入
                                 </Button>
                                 <Button size="small" type="danger" onClick={() => handleDelete(room.id)}>
                                     删除
-                                </Button>
+                                </Button> */}
                             </div>
                         </div>
                     ))}
@@ -123,7 +163,7 @@ export default function RoomListPage() {
             <div className="lg:hidden space-y-4">
                 {rooms.map(room => (
                     <div key={room.id} className="bg-white p-4 rounded-lg space-y-3">
-                        <div className="flex justify-between items-center">
+                        {/* <div className="flex justify-between items-center">
                             <span className="text-lg font-medium">房间 #{room.id}</span>
                             <span className={`px-2 py-1 rounded text-sm ${
                                 room.status === 1
@@ -132,8 +172,8 @@ export default function RoomListPage() {
                             }`}>
                                 {room.status === 1 ? '已连接' : '等待加入'}
                             </span>
-                        </div>
-                        
+                        </div> */}
+
                         <div className="space-y-2">
                             <div className="text-sm text-gray-500">CDKey</div>
                             <div className="font-mono text-sm bg-gray-50 p-2 rounded break-all">
@@ -145,14 +185,22 @@ export default function RoomListPage() {
                             创建时间: {formatDate(room.createdAt)}
                         </div>
 
-                        {/* <div className="flex gap-3 pt-2">
-                            <Button block type="primary" size="small" onClick={() => handleJoin(room.id)}>
+                        <div className="flex gap-3 pt-2">
+                            <Button
+                                block
+                                size="small"
+                                icon={<Qr />}
+                                onClick={() => handleShowQR(room.id)}
+                            >
+                                房间码
+                            </Button>
+                            {/* <Button block type="primary" size="small" onClick={() => handleJoin(room.id)}>
                                 加入
                             </Button>
                             <Button block type="danger" size="small" onClick={() => handleDelete(room.id)}>
                                删除
-                            </Button>
-                        </div> */}
+                            </Button> */}
+                        </div>
                     </div>
                 ))}
             </div>
@@ -165,6 +213,46 @@ export default function RoomListPage() {
             {!loading && rooms.length === 0 && (
                 <div className="py-8 text-center text-gray-500">暂无房间</div>
             )}
+
+            <Dialog
+                open={showQR}
+                onClose={() => setShowQR(false)}
+                className="relative z-50"
+            >
+                <div className="fixed inset-0 bg-black/30" />
+                <div className="fixed inset-0 flex items-center justify-center p-4">
+                    <DialogPanel className="w-full max-w-sm rounded-lg bg-white">
+                        <div className="p-4">
+                            <DialogTitle className="text-lg font-medium">房间二维码</DialogTitle>
+                            <div className="mt-4 aspect-square w-full relative flex flex-col items-center">
+                                {currentRoomQR && (
+                                    <Image
+                                        src={currentRoomQR!.qr}
+                                        width={200}
+                                        height={200}
+                                        alt="Room QR Code"
+                                        className="w-48 h-48 object-contain"
+                                    />
+                                )}
+                                <div className="mt-4 flex items-center gap-2 px-4">
+                                    {/* <div className="text-sm text-gray-500 break-all flex-1">
+                                                    {`${window.location.origin}/to/${room.id}`}
+                                                </div> */}
+                                    <Button
+                                        size="small"
+                                        onClick={() => copyRoomLink(currentRoomQR!.id)}
+                                    >
+                                        复制地址
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="mt-4 flex justify-end">
+                                <Button onClick={() => setShowQR(false)}>关闭</Button>
+                            </div>
+                        </div>
+                    </DialogPanel>
+                </div>
+            </Dialog>
         </div>
     )
 }

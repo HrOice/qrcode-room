@@ -99,6 +99,7 @@ function WaitingRoom() {
                     toast.success('用户已离开房间')
                     setUserReady(false)
                     setUserOnline(false)
+                    setIsReady(false)
                 },
                 () => {
                     return {
@@ -258,44 +259,13 @@ function WaitingRoom() {
 
     const startCamera = async () => {
         try {
-            // 检查浏览器是否支持 mediaDevices
-            // if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            //     // 尝试使用老版本的 API
-            //     const getUserMedia = navigator.getUserMedia ||
-            //         navigator.webkitGetUserMedia ||
-            //         navigator.mozGetUserMedia ||
-            //         navigator.msGetUserMedia;
-
-            //     if (!getUserMedia) {
-            //         // throw new Error('您的浏览器不支持访问相机，请使用最新版本的Chrome/Firefox/Safari')
-            //     } else {
-            //         // 使用老版本 API
-            //         getUserMedia.call(navigator,
-            //             { video: { facingMode: 'environment' } },
-            //             (stream) => {
-            //                 if (videoRef.current) {
-            //                     videoRef.current.srcObject = stream
-            //                     streamRef.current = stream
-            //                     setShowCamera(true)
-            //                     startScanning()
-            //                 }
-            //             },
-            //             (error) => {
-            //                 throw error
-            //             }
-            //         )
-            //         return
-            //     }
-
-            // }
-            // 先检查浏览器支持
-            setShowCamera(true)
-
             // return;
             if (!navigator.mediaDevices?.getUserMedia) {
                 toast.error('您的浏览器不支持访问相机')
                 return
             }
+            setShowCamera(true)
+
             // 使用现代 API
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
@@ -304,13 +274,13 @@ function WaitingRoom() {
                     height: { ideal: 720 }
                 }
             })
-
             // 检查 video 元素是否存在
             if (!videoRef.current) {
                 console.error('video 元素未找到')
+                setShowCamera(false)
                 return
             }
-            debugger
+
             if (videoRef.current) {
                 videoRef.current.srcObject = stream
                 videoRef.current.onloadedmetadata = () => {
@@ -318,6 +288,7 @@ function WaitingRoom() {
                         .catch(error => {
                             console.error('视频播放失败:', error)
                             toast.error('相机启动失败，请重试')
+                            setShowCamera(false)
                         })
                 }
                 streamRef.current = stream
@@ -328,7 +299,7 @@ function WaitingRoom() {
         } catch (err) {
             console.error('相机启动失败:', err)
             let errorMessage = '无法访问相机'
-
+            setShowCamera(false)
             // 根据具体错误类型显示不同提示
             if (err instanceof Error) {
                 if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -356,6 +327,7 @@ function WaitingRoom() {
 
     // 修改停止相机函数
     const stopCamera = useCallback(() => {
+        console.log('stop camera')
         // 清理扫描定时器
         if (scanIntervalRef.current) {
             clearInterval(scanIntervalRef.current)
@@ -715,14 +687,14 @@ function WaitingRoom() {
                                     />
                                 )}
                                 <div className="mt-4 flex items-center gap-2 px-4">
-                                    <div className="text-sm text-gray-500 break-all flex-1">
+                                    {/* <div className="text-sm text-gray-500 break-all flex-1">
                                         {`${window.location.origin}/to/${room.id}`}
-                                    </div>
+                                    </div> */}
                                     <Button
                                         size="small"
                                         onClick={() => copyToClipboard(`${window.location.origin}/to/${room.id}`)}
                                     >
-                                        复制
+                                        复制地址
                                     </Button>
                                 </div>
                             </div>

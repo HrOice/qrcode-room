@@ -8,6 +8,8 @@ class RoomStatus {
     private adminLastActive: Date;
     private activeTimeout: number;
     private _room : Room;
+    private socketId?: string;
+    private adminSocketId?: string
 
     constructor(room: Room, activeTimeout: number) {
         this.activeTimeout = activeTimeout;
@@ -18,6 +20,60 @@ class RoomStatus {
 
     get room() {
         return this._room;
+    }
+
+    setAdminSocketId(socketId?: string) {
+        this.adminSocketId = socketId;
+    }
+
+    getAdminSocketId() {
+        return this.adminSocketId;
+    }
+
+    setSocketId(socketId?: string) {
+        this.socketId = socketId;
+    }
+    getSocketId() {
+        return this.socketId;
+    }
+
+    validAdminSocketId(socketId: string) {
+        if (!this.adminSocketId) {
+            this.setAdminSocketId(socketId);
+            return true;
+        }
+        if (this.adminSocketId !== socketId) {
+            return false;
+        }
+    }
+
+    cancelAdminSocketId(socketId: string) {
+        if  (!this.adminSocketId) {
+            return;
+        }
+        if (this.adminSocketId === socketId) {
+            this.setAdminSocketId(undefined)
+        }
+    }
+
+
+    cancelSocketId(socketId: string) {
+        if  (!this.socketId) {
+            return;
+        }
+        if (this.socketId === socketId) {
+            this.setSocketId(undefined)
+        }
+    }
+
+    validSocketId(socketId: string) {
+        if (!this.socketId) {
+            this.setSocketId(socketId);
+            return true;
+        }
+        if (this.socketId !== socketId) {
+            return false;
+        }
     }
 
     updateRoom(room: Room) {

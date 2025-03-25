@@ -64,6 +64,15 @@ export function createSocketServer(server: any) {
         socket.data.adminId = -1
         socket.data.role = 'client'
         socket.data.roomId = roomId
+        const rs = roomCache.getRoom(roomId)
+        if (!rs) {
+          return next(new Error('房间不存在'))
+        } else {
+          const valid = rs.validSocketId(socket.id)
+          if (!valid) {
+            return next(new Error('房间不能进入，已有接收者'))
+          }
+        }
       } else {
         // 验证 valid_key
         const { id, key, valid, used, total } = await validCDKey(token);
@@ -136,6 +145,20 @@ export function createSocketServer(server: any) {
 
       try {
         const room = await adminJoinCreateRoom(ip, cdkeyId, socket.id,-1, TIMEOUT_MS)
+        const roomId = room.id
+        const rs = roomCache.getRoom(roomId)
+        if (!rs) {
+          socket.emit('error', { message: '房间已占用' })
+          socket.disconnect()
+          return;
+        } else {
+          const valid = rs.validAdminSocketId(socket.id)
+          if (!valid) {
+            socket.emit('error', { message: '房间已占用' })
+            socket.disconnect()
+            return;
+          }
+        }
         socket.data.roomId = room.id
         socket.join(String(room.id))
         console.log('sender-join cb', room.id, cb)
@@ -145,7 +168,7 @@ export function createSocketServer(server: any) {
         cb({roomId: room.id, ...clientStatus, used: socket.data.used, total: socket.data.total})
       } catch (error) {
         console.error(error)
-        socket.emit('error', { message: 'sender加入房间失败' })
+        socket.emit('error', { message: '发送者加入房间失败' })
       }
     })
 
@@ -300,11 +323,14 @@ export function createSocketServer(server: any) {
     // 断开连接
     socket.on('disconnect', () => {
       const roomId = socket.data.roomId;
+      const rs = roomCache.getRoom(roomId);
       console.log('Client disconnected:', roomId, socket.id, socket.data.role)
       if(socket.data.role === 'admin') {
         socket.to(String(roomId)).emit('admin-left')
+        rs?.cancelAdminSocketId(socket.id)
       } else {
         socket.to(String(roomId)).emit('user-left')
+        rs?.cancelSocketId(socket.id);
       }
     })
   })

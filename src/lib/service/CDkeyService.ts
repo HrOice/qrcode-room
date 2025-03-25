@@ -1,49 +1,68 @@
-
 import prisma from '@/lib/db';
 import { randomBytes } from 'crypto';
 
 
 const CHAR_SET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const GROUP_SIZE = 4;
-const GROUPS = 4;
+const PREFIX_LENGTH = 6;  // 前缀长度
+const SEQUENCE_LENGTH = 5;  // 序号长度
 
-function generateHighSecurityCDKey(): string {
-    // 生成足够的随机字节
-    const bytes = randomBytes(GROUP_SIZE * GROUPS);
+function generateRandomPrefix(): string {
+    const bytes = randomBytes(PREFIX_LENGTH);
+    return Array.from({ length: PREFIX_LENGTH }, (_, i) => {
+        const index = bytes[i] % CHAR_SET.length;
+        return CHAR_SET[index];
+    }).join('');
+}
 
-    // 生成每一组
-    const groups = Array.from({ length: GROUPS }, (_, groupIndex) => {
-        // 每组处理4个字节
-        const start = groupIndex * GROUP_SIZE;
-        return Array.from({ length: GROUP_SIZE }, (_, i) => {
-            // 使用随机字节取模得到字符集索引
-            const index = bytes[start + i] % CHAR_SET.length;
-            return CHAR_SET[index];
-        }).join('');
-    });
+function formatSequence(num: number): string {
+    return num.toString().padStart(SEQUENCE_LENGTH, '0');
+}
 
-    // 用 - 连接各组
-    return groups.join('-');
+function generateCDKeyWithSequence(prefix: string, sequence: number): string {
+    return `${prefix}-${formatSequence(sequence)}`;
 }
 
 /**
  * 创建cdkey
  * @param count 创建的CDKey数量
+ * @param totalUse 每个key可用次数
  * @returns 
  */
 export async function createCDKeys(number: number, totalUse: number) {
-    const keys = Array.from({ length: number }, () => ({
-        key: generateHighSecurityCDKey(),
+    // 生成一个随机前缀，所有key共用
+    const prefix = generateRandomPrefix();
+    
+    // 获取当前最大序号
+    const lastKey = await prisma.cDKey.findFirst({
+        orderBy: {
+            key: 'desc'
+        }
+    });
+
+    // 确定起始序号
+    let startSequence = 10001; // 默认起始值
+    if (lastKey?.key) {
+        const match = lastKey.key.match(/-(\d+)$/);
+        if (match) {
+            startSequence = parseInt(match[1]) + 1;
+        }
+    }
+
+    // 生成指定数量的key
+    const keys = Array.from({ length: number }, (_, i) => ({
+        key: generateCDKeyWithSequence(prefix, startSequence + i),
         used: 0,
         total: totalUse,
         status: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
     }));
-    console.log(keys)
+
+    // 批量创建
     await prisma.cDKey.createMany({
         data: keys,
     });
+
     return keys;
 }
 
