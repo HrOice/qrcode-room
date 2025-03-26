@@ -40,11 +40,17 @@ export class RoomSocket {
             if (error.message === 'unauthorized') {
                 console.error('Authentication failed')
                 // 可以在这里处理未授权的情况，比如跳转到登录页
-                window.location.href = '/login'
-            } else if (error.message === 'admin.unauthorized') {
-                console.error('admin Authentication failed')
                 // 可以在这里处理未授权的情况，比如跳转到登录页
-                window.location.href = '/admin/login'
+                setTimeout(() => {
+                    window.location.href = '/login'
+                },2000)
+            } else if (error.message === 'cdkey.invalid') {
+                console.error('sender Authentication failed')
+                toast.error('卡密不存在或者失效，请检查')
+                // 可以在这里处理未授权的情况，比如跳转到登录页
+                setTimeout(() => {
+                    window.location.href = '/login'
+                },2000)
             } else {
                 console.error('uncaught error', error)
                 toast.error(error?.message||'加入失败')
@@ -72,7 +78,7 @@ export class RoomSocket {
         onAdminReady: (ready: boolean) => void,
         onAdminLeft: () => void,
         onJoinRoom: (roomId: number, adminReady: boolean, adminOnline: boolean, used: number, total: number) => void,
-        onReceiveImg: (data: string, used: number) => void,
+        onReceiveImg: (data: string, used: number, total: number) => void,
         onStatus: () => { ready: boolean },
         _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void
     ) {
@@ -89,9 +95,9 @@ export class RoomSocket {
             console.log('admin left ')
             onAdminLeft()
         })
-        this.socket.on('admin-send', (data, used, cb) => {
+        this.socket.on('admin-send', (data, used, total, cb) => {
             debugger
-            onReceiveImg(data, used)
+            onReceiveImg(data, used, total)
             cb()
         })
         this.socket.on('status', (cb) => {
@@ -116,7 +122,7 @@ export class RoomSocket {
         onSenderReady: (ready: boolean) => void,
         onSenderLeft: () => void,
         onJoinRoom: (roomId: number, senderReady: boolean, senderOnline: boolean, used: number, total: number) => void,
-        onReceiveImg: (data: string, used: number) => void,
+        onReceiveImg: (data: string, used: number, total: number) => void,
         onStatus: () => { ready: boolean },
         _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void,
         onSenderSuccess: () => void
@@ -134,9 +140,9 @@ export class RoomSocket {
             console.log('admin left ')
             onSenderLeft()
         })
-        this.socket.on('admin-send', (data, used, cb) => {
+        this.socket.on('admin-send', (data, used,total, cb) => {
             debugger
-            onReceiveImg(data, used)
+            onReceiveImg(data, used, total)
             cb()
         })
         this.socket.on('status', (cb) => {
@@ -192,7 +198,7 @@ export class RoomSocket {
         onJoinRoom: (roomId: number, receiverReady: boolean, receiverOnline: boolean, roomCreatedAt:string, roomExpired: number) => void,
         _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void,
         onUserJoin: () => void,
-        onReceiverSuccess: (used:number) => void,
+        onReceiverSuccess: (used:number, total: number) => void,
     ) {
 
         this.socket.emit('sender-join', { ip: '127.0.0.1' }, (response: { roomId: number, ready: boolean, online: boolean, roomCreatedAt: string, roomExpired: number }) => {
@@ -225,16 +231,16 @@ export class RoomSocket {
         })
     }
     // type 0 图片，1文本
-    async adminSend(data: string, onSuccess: (used: number) => void) {
-        this.socket.emit('admin-send', data, (used: number) => {
-            onSuccess(used)
+    async adminSend(data: string, onSuccess: (used: number, total: number) => void) {
+        this.socket.emit('admin-send', data, (used: number, total: number) => {
+            onSuccess(used, total)
         })
     }
 
-    async senderSuccess(onSuccess: (used: number) => void) {
-        this.socket.emit('sender-success', (used: number) => {
+    async senderSuccess(onSuccess: (used: number, total: number) => void) {
+        this.socket.emit('sender-success', (used: number, total: number) => {
            // 发送者点击成功
-           onSuccess(used)
+           onSuccess(used, total)
         })
     }
 

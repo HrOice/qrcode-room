@@ -117,7 +117,7 @@ export function createSocketServer(server: any) {
         const { id, key, valid, used, total } = await validCDKey(token);
 
         if (!valid) {
-          return next(new Error('unauthorized'))
+          return next(new Error('cdkey.invalid'))
         }
 
 
@@ -290,16 +290,16 @@ function handleAdminSend(socket: Socket) {
   socket.on('admin-send', async (data, cb) => {
     const roomId = socket.data.roomId;
     // 先验证
-    const { valid, used } = await validCDKey(socket.data.key, socket.data.keyId);
+    const { valid, used, total } = await validCDKey(socket.data.key, socket.data.keyId);
     if (!valid) {
       cb(-1);
       return;
     }
-    socket.to(String(roomId)).emit('admin-send', data, used! + 1, async () => {
+    socket.to(String(roomId)).emit('admin-send', data, used! + 1, total, async () => {
       // 发送成功减次数
       console.log('send success........', roomId, data.length);
       // 直接返回原结果
-      cb(used);
+      cb(used, total);
     });
   });
 }

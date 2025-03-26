@@ -54,7 +54,7 @@ function WaitingRoom() {
     // 添加倒计时状态
     const [countdown, setCountdown] = useState<string>('')
     const countdownIntervalRef = useRef<NodeJS.Timer | null>(null)
-
+    const totalRef =  useRef(0)
     // 添加倒计时处理函数
     const startCountdown = useCallback((roomCreatedAt: string, roomExpired: number) => {
         const updateCountdown = () => {
@@ -94,12 +94,16 @@ function WaitingRoom() {
     }, [isReady])
     // 获取房间详情
     const fetchRoomDetail = useCallback(async () => {
+        if(roomId == 0) {
+            return;
+        }
         const { room } = await roomApi.getRoom(roomId)
         if (!room) {
             return;
         }
         setRoom(room)
         setUsedCount(room.cdkey.used)
+        totalRef.current = room.cdkey.total
     }, [roomId])
     // 添加清空函数
     const handleClear = () => {
@@ -115,7 +119,7 @@ function WaitingRoom() {
     }, [])
     const onOrderSuccess = useCallback((used: number) => {
         setOrderSuccessBtnOpen(false)
-        if (used > 0) {
+        if (used <= totalRef.current) {
             setUsedCount(used)
             toast.success('成功, 3秒后离开房间')
         } else {
@@ -284,15 +288,13 @@ function WaitingRoom() {
         if (!roomSocketRef.current || !textValue) return
         setLoading(true)
         try {
-            roomSocketRef.current!.adminSend(textValue, (used) => {
-                if (used > 0) {
+            roomSocketRef.current!.adminSend(textValue, (used, total) => {
+                if (used <= total) {
                     toast.success('发送成功')
                     setSendSuccess(true)
+                    setUsedCount(used)
                 } else {
                     toast.success('次数不足')
-                }
-                if (used > 0) {
-                    setUsedCount(used)
                 }
             })
         } catch (error) {
