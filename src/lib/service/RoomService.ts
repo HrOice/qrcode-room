@@ -148,9 +148,9 @@ export async function checkRoomOrCreate(ip: string, cdkeyId: number, socketId: s
     return room;
 }
 
-export async function senderCheckRoomOrCreate(ip: string, cdkeyId: number, adminSocketId: string) {
-    let room = await prisma.room.findFirst({
-        where: { ip, cdkeyId }
+export async function senderCheckRoomOrCreate(id: number, ip: string, cdkeyId: number, adminSocketId: string) {
+    let room = await prisma.room.findUnique({
+        where: { id }
     })
     console.log('find room', room)
 
@@ -158,6 +158,7 @@ export async function senderCheckRoomOrCreate(ip: string, cdkeyId: number, admin
         console.log('room not exist ', ip, cdkeyId, adminSocketId)
         room = await prisma.room.create({
             data: {
+                id,
                 ip,
                 cdkeyId,
                 lastActive: new Date(),

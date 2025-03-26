@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
+import ConfirmDialog from '@/components/ConfirmDialog'
 import { RoomSocket } from '@/lib/socket/client'
 import { useParams, useRouter } from 'next/navigation'
-import { Suspense, useEffect, useRef, useState } from 'react'
-import { Toaster } from 'react-hot-toast'
-import { Button, Image } from 'react-vant'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import toast, { Toaster } from 'react-hot-toast'
+import { Button } from 'react-vant'
 
 // 接收方
 // 创建一个包装组件来处理搜索参数
@@ -20,13 +21,34 @@ function WaitingContent() {
     const [roomId, setRoomId] = useState(0);
     const [ready, setReady] = useState(false) // 添加用户准备状态
     const readyRef = useRef(false)  // 添加 ref 来跟踪最新状态
-    const [imgSrc, setImgsrc] = useState('')
+    const [reveivedUrl, setReveivedUrl] = useState('')
+    const [orderSuccessBtnOpen, setOrderSuccessBtnOpen] = useState(false)
+    const [sendSuccess, setSendSuccess] = useState(false)
 
+    const roomSocketRef = useRef<RoomSocket | null>(null)
 
 
     useEffect(() => {
         readyRef.current = ready  // 当 ready 状态改变时更新 ref
     }, [ready])
+
+    const resetStatus = () => {
+        setAdminJoin(false)
+        setAdminReady(false)
+        setReady(false)
+        setSendSuccess(false)
+        setReveivedUrl('')
+    }
+
+
+    const onOrderSuccess = useCallback(() => {
+        setOrderSuccessBtnOpen(false)
+        toast.success('成功反馈, 3秒后离开房间')
+        setTimeout(() => {
+            resetStatus()
+            roomSocketRef.current!.adminDisconnect()
+        }, 3000)
+    }, [])
 
 
     useEffect(() => {
@@ -34,44 +56,53 @@ function WaitingContent() {
         if (!roomId) {
             throw new Error('房间不存在')
         }
-        const roomSocket = new RoomSocket('student', parseInt(roomId as string), () => {
-            setReconnect(true)
-        })
-        setReconnect(false)
-        roomSocket.receiverJoinRoom(parseInt(roomId as string), () => {
-            setAdminJoin(true)
-        }, (ready) => {
-            setAdminReady(ready)
-        }, () => {
-            setAdminJoin(false)
-            setAdminReady(false)
-            setReady(false)
-        }, (id, ready, online, used) => {
-            setRoomId(id)
-            setAdminJoin(online)
-            setAdminReady(ready)
-            // setTotalCount(total)
-            // setUsedCount(used)
-        }, (data) => {
-            setImgsrc(data)
-            // setUsedCount(used)
-        }, () => {
-            const currentReady = readyRef.current;  // 记录当前状态以便调试
-            console.log('Status check, current ready state:', currentReady);
-            return {
-                ready: currentReady,
-            }
-        }, (param) => {
-            const { online, ready } = param
-            setAdminJoin(online)
-            setAdminReady(ready)
-        })
-        setSocket(roomSocket)
-
-        return () => {
-            roomSocket.clientDisconnect()
+        if (!roomSocketRef.current) {
+            const roomSocket = new RoomSocket('student', parseInt(roomId as string), () => {
+                setReconnect(true)
+            })
+            roomSocketRef.current = roomSocket
+            setReconnect(false)
+            roomSocket.receiverJoinRoom(parseInt(roomId as string), () => {
+                setAdminJoin(true)
+            }, (ready) => {
+                setAdminReady(ready)
+            }, () => {
+                resetStatus()
+            }, (id, ready, online, used) => {
+                setRoomId(id)
+                setAdminJoin(online)
+                setAdminReady(ready)
+                setReady(false)
+                // setTotalCount(total)
+                // setUsedCount(used)
+            }, (data) => {
+                setReveivedUrl(data)
+                setSendSuccess(true)
+                // setUsedCount(used)
+            }, () => {
+                const currentReady = readyRef.current;  // 记录当前状态以便调试
+                console.log('Status check, current ready state:', currentReady);
+                return {
+                    ready: currentReady,
+                }
+            }, (param) => {
+                // 没用
+                const { online, ready } = param
+                setAdminJoin(online)
+                setAdminReady(ready)
+            }, () => {
+                setSendSuccess(false)
+                onOrderSuccess()
+            })
+            setSocket(roomSocket)
         }
-    }, [params, router, reconnectKey]) // 添加 reconnectKey 到依赖数组
+        return () => {
+            if (roomSocketRef.current) {
+                roomSocketRef.current!.clientDisconnect()
+                roomSocketRef.current = null
+            }
+        }
+    }, [params, router, reconnectKey, onOrderSuccess]) // 添加 reconnectKey 到依赖数组
 
     // 处理准备按钮点击
     const handleReady = () => {
@@ -89,6 +120,20 @@ function WaitingContent() {
         if (!socket) return
         socket.clientLeaveRoom()
         router.replace("/login")
+    }
+
+    const handleOrderSuccess = async () => {
+        setOrderSuccessBtnOpen(false)
+        try {
+            await roomSocketRef.current!.receiverSuccess(() => {
+                onOrderSuccess()
+            })
+        } catch (error) {
+            console.error(error)
+            toast.error('提交失败')
+        } finally {
+            // setLoading()
+        }
     }
 
     return (
@@ -129,17 +174,46 @@ function WaitingContent() {
                         <div className="space-y-4">
                             {/* 二维码展示区域 */}
                             <div className="bg-white rounded-lg p-4">
-                                <div className="aspect-square w-full max-w-sm mx-auto border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center">
+                                <div className="aspect-square w-full max-w-sm mx-auto rounded-lg flex items-center justify-center">
                                     {!adminReady ? (
                                         <div className="text-gray-400">
                                             等待发送者准备...
                                         </div>
-                                    ) : imgSrc ? (
-                                        <Image
-                                            src={imgSrc}
-                                            alt="QR Code"
-                                            className="w-full h-full object-contain p-4"
-                                        />
+                                    ) : reveivedUrl ? (
+                                        <div className='w-full flex flex-col items-center'>
+                                            <div className='p-4'>接收成功</div>
+                                            <Button
+                                                type="primary" block
+                                                onClick={() => {
+                                                    if (reveivedUrl.startsWith('http://') || reveivedUrl.startsWith("https://")) {
+                                                        window.open(reveivedUrl, '_blank')
+                                                    } else {
+                                                        toast.error('非法地址')
+                                                    }
+                                                }}
+                                            >
+                                                打开链接
+                                            </Button>
+                                            {sendSuccess && (<><Button
+                                                block
+                                                type="info"
+                                                disabled={!sendSuccess}
+                                                onClick={() => {
+                                                    setOrderSuccessBtnOpen(true)
+                                                }}
+                                            >
+                                                成功
+                                            </Button>
+                                                <ConfirmDialog
+                                                    open={orderSuccessBtnOpen}
+                                                    title="确认成功？"
+                                                    content="确认成功？"
+                                                    confirmText="确认"
+                                                    confirmType="primary"
+                                                    onConfirm={handleOrderSuccess}
+                                                    onCancel={() => setOrderSuccessBtnOpen(false)}
+                                                /></>)}
+                                        </div>
                                     ) : (
                                         <div className="text-gray-400">
                                             等待发送者发送...

@@ -120,12 +120,7 @@ export default function CDKeyPage() {
                                     <Button
                                         size="mini"
                                         onClick={async () => {
-                                            const success = await copyToClipboard(cdkey.key)
-                                            if (success) {
-                                                toast.success('已复制到剪贴板')
-                                            } else {
-                                                toast.error('复制失败')
-                                            }
+                                            await copyToClipboard(cdkey.key)
                                         }}
                                     >
                                         复制
@@ -135,16 +130,16 @@ export default function CDKeyPage() {
                                 {/* 在小屏幕下显示的信息 */}
                                 <div className="lg:hidden w-full grid grid-cols-2 gap-2 text-sm text-gray-600">
                                     <div>使用次数: {cdkey.used}/{cdkey.total}</div>
-                                    {/*<div>*/}
-                                    {/*    状态: */}
-                                    {/*    <span className={`ml-1 px-2 py-1 rounded ${*/}
-                                    {/*        cdkey.status */}
-                                    {/*            ? 'bg-green-50 text-green-600' */}
-                                    {/*            : 'bg-red-50 text-red-600'*/}
-                                    {/*    }`}>*/}
-                                    {/*        {cdkey.status ? '可用' : '禁用'}*/}
-                                    {/*    </span>*/}
-                                    {/*</div>*/}
+                                    <div>
+                                       状态:
+                                       <span className={`ml-1 px-2 py-1 rounded ${
+                                           cdkey.status
+                                               ? 'bg-green-50 text-green-600'
+                                               : 'bg-red-50 text-red-600'
+                                       }`}>
+                                           {cdkey.status ? '可用' : '失效'}
+                                       </span>
+                                    </div>
                                     <div>创建时间: {format(new Date(cdkey.createdAt), 'yyyy-MM-dd HH:mm')}</div>
                                 </div>
 
@@ -158,7 +153,7 @@ export default function CDKeyPage() {
                                             ? 'bg-green-50 text-green-600' 
                                             : 'bg-red-50 text-red-600'
                                     }`}>
-                                        {cdkey.status ? '可用' : '禁用'}
+                                        {cdkey.status ? '可用' : '失效'}
                                     </span>
                                 </div>
                                 <div className="hidden lg:block text-gray-600 text-sm">

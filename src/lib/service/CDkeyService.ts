@@ -31,7 +31,7 @@ function generateCDKeyWithSequence(prefix: string, sequence: number): string {
 export async function createCDKeys(number: number, totalUse: number) {
     // 生成一个随机前缀，所有key共用
     const prefix = generateRandomPrefix();
-    
+
     // 获取当前最大序号
     const lastKey = await prisma.cDKey.findFirst({
         orderBy: {
@@ -53,7 +53,7 @@ export async function createCDKeys(number: number, totalUse: number) {
         key: generateCDKeyWithSequence(prefix, startSequence + i),
         used: 0,
         total: totalUse,
-        status: 0,
+        status: 1,
         createdAt: new Date(),
         updatedAt: new Date(),
     }));
@@ -72,8 +72,8 @@ export async function createCDKeys(number: number, totalUse: number) {
  * @returns 
  */
 export async function validCDKey(key: string, id?: number):
-    Promise<{ id?: number; key?: string; valid: boolean; used?: number; total?:number}> {
-    const where: {id?:number, key?:string} = {}
+    Promise<{ id?: number; key?: string; valid: boolean; used?: number; total?: number }> {
+    const where: { id?: number, key?: string } = {}
     if (id != null) {
         where.id = id;
     } else {
@@ -83,12 +83,12 @@ export async function validCDKey(key: string, id?: number):
         where
     });
     if (!cdkey) {
-        return {valid: false};
+        return { valid: false };
     }
-    if (cdkey.used >= cdkey.total) {
-        return {id: cdkey.id, key: cdkey.key, valid: false};
+    if (cdkey.used >= cdkey.total || cdkey.status != 1) {
+        return { id: cdkey.id, key: cdkey.key, valid: false };
     }
-    return {id: cdkey.id, key: cdkey.key, valid: true, used: cdkey.used, total: cdkey.total };
+    return { id: cdkey.id, key: cdkey.key, valid: true, used: cdkey.used, total: cdkey.total };
 }
 /**
  * 使用cdkey
@@ -104,8 +104,8 @@ export async function useCDKey(id: number, ip: string, adminId: number) {
     if (!cdkey) {
         return -1;
     }
-    if (cdkey.used >= cdkey.total) {
-        return -1;
+    if (cdkey.used >= cdkey.total || cdkey.status != 1) {
+        return -2;
     }
     try {
         const result = await prisma.$transaction(async (tx) => {
@@ -141,6 +141,22 @@ export async function useCDKey(id: number, ip: string, adminId: number) {
     }
 }
 
+export async function invalidCDKey(ids: number[]) {
+    if (ids.length > 0) {
+        return prisma.cDKey.updateMany({
+            where: {
+                id: {
+                    in: ids
+                }
+            }, 
+            data: {
+                status: 0
+            }
+        })
+    }
+    return null;
+}
+
 /**
  * 获取cdkey列表
  * @param page
@@ -149,7 +165,7 @@ export async function useCDKey(id: number, ip: string, adminId: number) {
  * @param total
  * @returns
  */
-export async function getCDKeys(page: number , keyword: string | undefined, status: number | undefined, total: number | undefined) {
+export async function getCDKeys(page: number, keyword: string | undefined, status: number | undefined, total: number | undefined) {
     const pageSize = 10;
     console.log({ page, keyword, status, total })
     const where = {

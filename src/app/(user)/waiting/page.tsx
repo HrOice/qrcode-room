@@ -8,6 +8,9 @@ import { Jimp, ResizeStrategy } from 'jimp'
 import jsQR from 'jsqr'
 import QRCode from 'qrcode'
 
+import ConfirmDialog from '@/components/ConfirmDialog'
+import { copyToClipboard } from '@/lib/utils/clipboard'
+import { generateQR, generateQRWithText } from '@/lib/utils/qrcode'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { Qr } from '@react-vant/icons'
 import Image from 'next/image'
@@ -45,7 +48,46 @@ function WaitingRoom() {
     const [roomId, setRoomId] = useState(0)
     const [showRoomQR, setShowRoomQR] = useState(false)
     const [roomQRCode, setRoomQRCode] = useState('')
+    const [sendSuccess, setSendSuccess] = useState(false)
     const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const [orderSuccessBtnOpen, setOrderSuccessBtnOpen] = useState(false)
+    // 添加倒计时状态
+    const [countdown, setCountdown] = useState<string>('')
+    const countdownIntervalRef = useRef<NodeJS.Timer | null>(null)
+
+    // 添加倒计时处理函数
+    const startCountdown = useCallback((roomCreatedAt: string, roomExpired: number) => {
+        const updateCountdown = () => {
+            const now = new Date()
+            const createdAt = new Date(roomCreatedAt)
+            const timeLimit = roomExpired // 30分钟
+            const timePassed = now.getTime() - createdAt.getTime()
+            const timeLeft = timeLimit - timePassed
+
+            if (timeLeft <= 0) {
+                if (countdownIntervalRef.current) {
+                    clearInterval(countdownIntervalRef.current as NodeJS.Timeout)
+                }
+                setCountdown('已超时')
+                return
+            }
+
+            const minutes = Math.floor(timeLeft / 60000)
+            const seconds = Math.floor((timeLeft % 60000) / 1000)
+            setCountdown(`${minutes}分${seconds}秒`)
+        }
+
+        // 清除已存在的定时器
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current as NodeJS.Timeout)
+        }
+
+        // 立即更新一次
+        updateCountdown()
+        // 设置定时更新
+        countdownIntervalRef.current = setInterval(updateCountdown, 1000)
+    }, [])
+
 
     useEffect(() => {
         readyRef.current = isReady  // 当 ready 状态改变时更新 ref
@@ -64,16 +106,29 @@ function WaitingRoom() {
         setQrCodeData(null)
         setTextValue('')
     }
-    // 添加复制函数
-    const copyToClipboard = async (text: string) => {
-        try {
-            await navigator.clipboard.writeText(text)
-            toast.success('链接已复制')
-        } catch (err) {
-            console.error('复制失败:', err)
-            toast.error('复制失败')
+    const resetStatus = useCallback(() => {
+        setUserReady(false)
+        setUserOnline(false)
+        setIsReady(false)
+        setSendSuccess(false)
+        handleClear()
+    }, [])
+    const onOrderSuccess = useCallback((used: number) => {
+        setOrderSuccessBtnOpen(false)
+        if (used > 0) {
+            setUsedCount(used)
+            toast.success('成功, 3秒后离开房间')
+        } else {
+            toast.success('次数不足')
+            roomSocketRef.current!.adminDisconnect()
         }
-    }
+
+        setTimeout(() => {
+            roomSocketRef.current!.adminDisconnect()
+            resetStatus()
+        }, 3000)
+    }, [resetStatus])
+
     // 使用 useRef 确保 socket 实例只初始化一次
     const roomSocketRef = useRef<RoomSocket | null>(null)
     // 初始化 Socket 连接
@@ -97,17 +152,16 @@ function WaitingRoom() {
                 },
                 () => {
                     toast.success('用户已离开房间')
-                    setUserReady(false)
-                    setUserOnline(false)
-                    setIsReady(false)
+                    resetStatus()
                 },
                 () => {
                     return {
                         ready: readyRef.current,
                     }
                 },
-                (roomId, ready, online) => {
-
+                (roomId, ready, online, roomCreatedAt, roomExpired) => {
+                    startCountdown(roomCreatedAt, roomExpired)  // 启动倒计时
+                    // 当前客户端时间与roomCreatedAt计算差值，
                     setRoomId(roomId)
                     // 获取房间详情
                     fetchRoomDetail()
@@ -121,6 +175,9 @@ function WaitingRoom() {
                     setUserOnline(true)
                     setUserReady(false)
                     setIsReady(false)
+                    setSendSuccess(false)
+                }, (used) => {
+                    onOrderSuccess(used)
                 }
             )
 
@@ -134,8 +191,11 @@ function WaitingRoom() {
                 roomSocketRef.current!.adminDisconnect()
                 roomSocketRef.current = null
             }
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current as NodeJS.Timeout)
+            }
         }
-    }, [roomId, router, fetchRoomDetail, reconnectKey, searchParams])
+    }, [roomId, router, fetchRoomDetail, reconnectKey, searchParams, resetStatus, onOrderSuccess, startCountdown])
 
     // 处理准备状态
     const handleReady = () => {
@@ -146,12 +206,13 @@ function WaitingRoom() {
         })
     }
 
-    // 处理文本转二维码
+    // 修改文本变化处理函数
     const handleTextChange = async (text: string) => {
         try {
             setTextValue(text)
             if (text) {
-                const qrDataUrl = await QRCode.toDataURL(text)
+                // 不带文字
+                const qrDataUrl = await generateQR(text)  // 添加中心文本
                 setQrCodeData({
                     url: qrDataUrl,
                     type: 'text'
@@ -223,19 +284,13 @@ function WaitingRoom() {
         if (!roomSocketRef.current || !textValue) return
         setLoading(true)
         try {
-            // 根据文本内容重新生成二维码
-            const qrDataUrl = await QRCode.toDataURL(textValue, {
-                width: 400, // 限制宽度
-                margin: 1,  // 减小边距
-                // quality: 0.8, // 降低质量以减小大小
-                scale: 4, // 降低缩放比例
-                type: 'image/jpeg', // 使用 JPEG 格式代替 PNG
-
-            })            // 发送生成的二维码
-            const dataSize = qrDataUrl.length
-            console.log('sending qr code, size:', Math.round(dataSize / 1024), 'KB')
-            roomSocketRef.current!.adminSend(qrDataUrl, (used) => {
-                toast.success(used > 0 ? '提交成功' : '没有次数')
+            roomSocketRef.current!.adminSend(textValue, (used) => {
+                if (used > 0) {
+                    toast.success('发送成功')
+                    setSendSuccess(true)
+                } else {
+                    toast.success('次数不足')
+                }
                 if (used > 0) {
                     setUsedCount(used)
                 }
@@ -372,7 +427,8 @@ function WaitingRoom() {
 
             if (code && code.data && code.data.trim()) {
                 setTextValue(code.data)
-                QRCode.toDataURL(code.data).then(url => {
+                // 不带文字
+                generateQR(code.data).then(url => {
                     setQrCodeData({
                         url: url,
                         type: 'text'
@@ -412,17 +468,35 @@ function WaitingRoom() {
         };
     }, [showCamera, scanQRCode]);
 
+    // 修改房间二维码生成
     const generateRoomQR = useCallback(async () => {
         if (!room) return
         const url = `${window.location.origin}/to/${room.id}`
         try {
-            const qrDataUrl = await QRCode.toDataURL(url)
+            const qrDataUrl = await generateQRWithText(url, {
+                centerText: String(room.id)
+            })
             setRoomQRCode(qrDataUrl)
         } catch (error) {
             console.error(error)
             toast.error('生成房间二维码失败')
         }
     }, [room])
+
+
+    const handleOrderSuccess = async () => {
+        setOrderSuccessBtnOpen(false)
+        try {
+            await roomSocketRef.current!.senderSuccess((used) => {
+                onOrderSuccess(used)
+            })
+        } catch (error) {
+            console.error(error)
+            toast.error('提交失败')
+        } finally {
+            // setLoading(false)
+        }
+    }
 
     if (!room) {
         return <div className="p-4 text-center">加载中...</div>
@@ -435,6 +509,11 @@ function WaitingRoom() {
                 <div className="flex justify-between items-center">
                     <h2 className="text-lg font-medium">房间 #{room.id}</h2>
                     <div className="flex items-center gap-2">
+                        {/* 添加倒计时显示 */}
+                        {!reconnect && <span className={`text-sm ${countdown === '已超时' ? 'text-red-600' : 'text-gray-600'
+                            }`}>
+                            剩余时间: {countdown}
+                        </span>}
                         <Button
                             size="small"
                             icon={<Qr />}
@@ -562,6 +641,25 @@ function WaitingRoom() {
                     >
                         发送给用户
                     </Button>
+                    {sendSuccess && (<><Button
+                        block
+                        type="info"
+                        disabled={!sendSuccess}
+                        onClick={() => {
+                            setOrderSuccessBtnOpen(true)
+                        }}
+                    >
+                        成功
+                    </Button>
+                        <ConfirmDialog
+                            open={orderSuccessBtnOpen}
+                            title="确认完成"
+                            content="确认成功后会扣减次数"
+                            confirmText="确认成功"
+                            confirmType="primary"
+                            onConfirm={handleOrderSuccess}
+                            onCancel={() => setOrderSuccessBtnOpen(false)}
+                        /></>)}
                 </div>
             )}
 
@@ -596,41 +694,16 @@ function WaitingRoom() {
             <Button block type="danger" onClick={() => setLeaveModalOpen(true)}>
                 离开房间
             </Button>
-            <Dialog open={leaveModalOpen} as="div" className="relative z-10 focus:outline-none" onClose={() => {
-                setLeaveModalOpen(false)
-            }}>
-                <div className="fixed inset-0 z-10 w-screen overflow-y-auto">
-                    <div className="flex min-h-full items-center justify-center p-4">
-                        <DialogPanel
-                            transition
-                            className="w-full max-w-md rounded-xl bg-gray-500 p-6"
-                        >
-                            <DialogTitle as="h3" className="text-base/7 font-medium text-white">
-                                确认离开
-                            </DialogTitle>
-                            <p className="mt-2 text-sm/6 text-white/50">
-                                离开后可重新加入
-                            </p>
-                            <div className="mt-4 flex w-full flex-row-reverse">
-                                <Button
-                                    type='primary'
-                                    className='flex-1 mx-1'
-                                    onClick={handleLeave}
-                                >
-                                    离开
-                                </Button>
-                                <div className='w-2'></div>
-                                <Button
-                                    className='flex-1 mx-1.5'
-                                    onClick={() => setLeaveModalOpen(false)}
-                                >
-                                    取消
-                                </Button>
-                            </div>
-                        </DialogPanel>
-                    </div>
-                </div>
-            </Dialog>
+            {/* 离开Dialog */}
+            <ConfirmDialog
+                open={leaveModalOpen}
+                title="确认离开"
+                content="离开后可重新加入"
+                confirmText="离开"
+                confirmType="primary"
+                onConfirm={handleLeave}
+                onCancel={() => setLeaveModalOpen(false)}
+            />
             {/* 修改相机对话框部分 */}
             <Dialog
                 open={showCamera}
@@ -675,7 +748,7 @@ function WaitingRoom() {
                 <div className="fixed inset-0 flex items-center justify-center p-4">
                     <DialogPanel className="w-full max-w-sm rounded-lg bg-white">
                         <div className="p-4">
-                            <DialogTitle className="text-lg font-medium">房间二维码</DialogTitle>
+                            <DialogTitle className="text-lg font-medium">房间二维码 #{room.id}</DialogTitle>
                             <div className="mt-4 aspect-square w-full relative flex flex-col items-center">
                                 {roomQRCode && (
                                     <Image
@@ -705,6 +778,8 @@ function WaitingRoom() {
                     </DialogPanel>
                 </div>
             </Dialog></div>)
+
+
 }
 
 // 修改默认导出组件

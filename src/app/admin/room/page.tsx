@@ -4,10 +4,11 @@ import { roomApi, type Room } from '@/lib/api/room';
 import { formatDate } from '@/lib/utils/dateFormat';
 import { Qr, Search } from '@react-vant/icons';
 import Image from 'next/image';
-import QRCode from 'qrcode';
 import { toast } from 'react-hot-toast';
 
 // import { useRouter } from 'next/navigation';
+import { copyToClipboard } from '@/lib/utils/clipboard';
+import { generateQRWithText } from '@/lib/utils/qrcode';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Input } from 'react-vant';
@@ -62,13 +63,13 @@ export default function RoomListPage() {
     //     })
     // }
 
+
     // 生成和显示二维码
     const handleShowQR = async (roomId: number) => {
         try {
             const url = `${window.location.origin}/to/${roomId}`
-            const qrDataUrl = await QRCode.toDataURL(url, {
-                width: 200,
-                margin: 1
+            const qrDataUrl = await generateQRWithText(url, {
+                centerText: String(roomId)
             })
             setCurrentRoomQR({ id: roomId, qr: qrDataUrl })
             setShowQR(true)
@@ -81,13 +82,7 @@ export default function RoomListPage() {
     // 复制链接
     const copyRoomLink = async (roomId: number) => {
         const url = `${window.location.origin}/to/${roomId}`
-        try {
-            await navigator.clipboard.writeText(url)
-            toast.success('链接已复制')
-        } catch (err) {
-            console.error('复制失败:', err)
-            toast.error('复制失败')
-        }
+        copyToClipboard(url)
     }
 
     useEffect(() => {
@@ -175,7 +170,7 @@ export default function RoomListPage() {
                         </div> */}
 
                         <div className="space-y-2">
-                            <div className="text-sm text-gray-500">CDKey</div>
+                            <div className="text-sm text-gray-500">CDKey #{room.id}</div>
                             <div className="font-mono text-sm bg-gray-50 p-2 rounded break-all">
                                 {room.cdkey.key}
                             </div>
@@ -223,7 +218,7 @@ export default function RoomListPage() {
                 <div className="fixed inset-0 flex items-center justify-center p-4">
                     <DialogPanel className="w-full max-w-sm rounded-lg bg-white">
                         <div className="p-4">
-                            <DialogTitle className="text-lg font-medium">房间二维码</DialogTitle>
+                            <DialogTitle className="text-lg font-medium">房间二维码 #{currentRoomQR?.id}</DialogTitle>
                             <div className="mt-4 aspect-square w-full relative flex flex-col items-center">
                                 {currentRoomQR && (
                                     <Image

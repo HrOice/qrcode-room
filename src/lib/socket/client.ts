@@ -53,6 +53,12 @@ export class RoomSocket {
             }
         })
 
+
+        this.socket.on('room-expired', (cb) => {
+            toast.error('房间已超时，正在退出')
+            cb()
+        })
+
         this.socket.on('error', (error) => {
             console.error('Socket error:', error)
             toast.error(error?.message || '连接失败')
@@ -112,7 +118,8 @@ export class RoomSocket {
         onJoinRoom: (roomId: number, senderReady: boolean, senderOnline: boolean, used: number, total: number) => void,
         onReceiveImg: (data: string, used: number) => void,
         onStatus: () => { ready: boolean },
-        _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void
+        _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void,
+        onSenderSuccess: () => void
     ) {
         // const ip = await getClientIp()
         // console.log("joi room", ip)
@@ -137,6 +144,8 @@ export class RoomSocket {
             console.log('onStatus', status)
             cb(status)
         })
+        this.socket.on('sender-success', onSenderSuccess)
+
         // 加入房间
         this.socket.emit('receiver-join', { ip:'null', key: this.token, roomId },
             (response: { roomId: number, ready: boolean, online: boolean, used: number, total: number }) => {
@@ -180,17 +189,18 @@ export class RoomSocket {
         onUserReady: (ready: boolean) => void,
         onUserLeft: () => void,
         onStatus: () => { ready: boolean },
-        onJoinRoom: (roomId: number, receiverReady: boolean, receiverOnline: boolean) => void,
+        onJoinRoom: (roomId: number, receiverReady: boolean, receiverOnline: boolean, roomCreatedAt:string, roomExpired: number) => void,
         _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void,
-        onUserJoin: () => void
+        onUserJoin: () => void,
+        onReceiverSuccess: (used:number) => void,
     ) {
 
-        this.socket.emit('sender-join', { ip: '127.0.0.1' }, (response: { roomId: number, ready: boolean, online: boolean }) => {
+        this.socket.emit('sender-join', { ip: '127.0.0.1' }, (response: { roomId: number, ready: boolean, online: boolean, roomCreatedAt: string, roomExpired: number }) => {
 
-            const { roomId, ready, online } = response
+            const { roomId, ready, online, roomCreatedAt, roomExpired } = response
             this.roomId = roomId
             console.log('sender join room', response)
-            onJoinRoom(this.roomId!, ready, online)
+            onJoinRoom(this.roomId!, ready, online, roomCreatedAt, roomExpired)
             this.startHeartbeat()
         })
         this.socket.on('receiver-join', onUserJoin)
@@ -200,6 +210,7 @@ export class RoomSocket {
             const status = onStatus()
             cb(status)
         })
+        this.socket.on('receiver-success', onReceiverSuccess)
     }
 
     async adminReady(ready: boolean, onReady: (ready: boolean) => void) {
@@ -217,6 +228,20 @@ export class RoomSocket {
     async adminSend(data: string, onSuccess: (used: number) => void) {
         this.socket.emit('admin-send', data, (used: number) => {
             onSuccess(used)
+        })
+    }
+
+    async senderSuccess(onSuccess: (used: number) => void) {
+        this.socket.emit('sender-success', (used: number) => {
+           // 发送者点击成功
+           onSuccess(used)
+        })
+    }
+
+    async receiverSuccess(onSuccess: () => void) {
+        this.socket.emit('receiver-success', () => {
+           // 发送者点击成功
+           onSuccess()
         })
     }
 

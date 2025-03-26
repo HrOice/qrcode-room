@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "ts-node -r tsconfig-paths/register --project tsconfig.server.json server.ts",
     "build": "next build",
-    "tsbuild":"next build && tsc server.ts" ,
+    "tsbuild": "next build && tsc server.ts",
     "start": "NODE_ENV=production ts-node -r tsconfig-paths/register --project tsconfig.server.json server.ts",
     "lint": "next lint",
     "db:seed": "npx prisma db seed"
@@ -42,6 +42,7 @@
     "eslint-config-next": "15.2.3",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5"
   }

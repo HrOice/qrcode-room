@@ -2,6 +2,8 @@
 
 import { checkRoomOrCreate, deleteRooms, findAndDeleteRoom, senderCheckRoomOrCreate, updateAdminInfo, updateReceiverInfo } from '@/lib/service/RoomService';
 import { Room } from "@prisma/client";
+import { Socket } from 'socket.io';
+import { invalidCDKey } from '../service/CDkeyService';
 
 class RoomStatus {
     private clientLastActive: Date;
@@ -10,12 +12,64 @@ class RoomStatus {
     private _room : Room;
     private socketId?: string;
     private adminSocketId?: string
+    private _roomCreatedAt?: Date; // 发送者加入的时间，如果超过半小时，触发房间失效，删除room，cdkey改成0
+    private _socket?: Socket;
+    private _adminSocket?: Socket;
 
-    constructor(room: Room, activeTimeout: number) {
+    constructor(room: Room, activeTimeout: number, adminSocket?:Socket, socket?:Socket) {
         this.activeTimeout = activeTimeout;
         this._room = room;
         this.clientLastActive = new Date();
         this.adminLastActive = new Date('2000-01-01');
+        this._socket = socket
+        this._adminSocket = adminSocket
+    }
+
+    get socket() :Socket | undefined  {
+        return this._socket;
+    }
+
+    get adminSocket(): Socket | undefined {
+        return this._adminSocket
+    }
+
+    set socket(socket: Socket) {
+        this._socket = socket
+    }
+
+    set adminSocket(adminSocket: Socket) {
+        this._adminSocket = adminSocket
+    }
+
+    resetSocket() {
+        this._adminSocket = undefined
+        this._socket = undefined
+    }
+
+    setRoomCreatedAt() {
+        if (this._roomCreatedAt) {
+            // 异常情况断开连接不处理
+        } else {
+            this._roomCreatedAt = new Date()
+        }
+    }
+
+    resetRoomCreatedAt() {
+        // 发送成功反馈后重置
+        this._roomCreatedAt = undefined
+    }
+
+    checkRoomExpired(timeout: number) {
+        if (this._roomCreatedAt) {
+            const now = new Date();
+            return now.getTime() - this._roomCreatedAt.getTime() > timeout;
+        } else {
+            return false
+        }
+    }
+
+    get roomCreatedAt() {
+        return this._roomCreatedAt
     }
 
     get room() {
@@ -53,6 +107,7 @@ class RoomStatus {
         }
         if (this.adminSocketId === socketId) {
             this.setAdminSocketId(undefined)
+            this._adminSocket = undefined
         }
     }
 
@@ -63,6 +118,7 @@ class RoomStatus {
         }
         if (this.socketId === socketId) {
             this.setSocketId(undefined)
+            this._socket = undefined
         }
     }
 
@@ -90,7 +146,7 @@ class RoomStatus {
     }
 
     updateActive(role: string) : void {
-        console.log('updateActive', role, this.adminLastActive, this.clientLastActive)
+        // console.log('updateActive', role, this.adminLastActive, this.clientLastActive)
         if (role === 'admin') {
             this.updateAdminActive();
         } else if (role === 'client') {
@@ -103,15 +159,15 @@ class RoomStatus {
     // 检查是否在线
     isClientOnline(): boolean {
         const now = new Date();
-        const r = !!this.room.socketId && (now.getTime() - this.clientLastActive.getTime() <= this.activeTimeout);
-        console.log('isClientOnline', r, this.room.socketId, now, this.clientLastActive)
+        const r = !!this.socketId && (now.getTime() - this.clientLastActive.getTime() <= this.activeTimeout);
+        console.log('isClientOnline', r, this.socketId, now, this.clientLastActive)
         return r;
     }
 
     isAdminOnline(): boolean {
         const now = new Date();
-        const r = !!this.room.adminSocketId && (now.getTime() - this.adminLastActive.getTime() <= this.activeTimeout);
-        console.log('isAdminOnline', r, this.room.adminSocketId, now, this.adminLastActive)
+        const r = !!this.adminSocketId && (now.getTime() - this.adminLastActive.getTime() <= this.activeTimeout);
+        console.log('isAdminOnline', r, this.adminSocketId, now, this.adminLastActive)
         return r;
     }
 
@@ -130,7 +186,7 @@ class RoomStatus {
 }
 
 class RoomCache {
-    private static insntance: RoomCache;
+    private static instance: RoomCache;
     private roomMap: Map<number, RoomStatus>;
 
     constructor() {
@@ -139,10 +195,10 @@ class RoomCache {
     }
 
     public static getInstance(): RoomCache {
-        if (!RoomCache.insntance) {
-            RoomCache.insntance = new RoomCache();
+        if (!RoomCache.instance) {
+            RoomCache.instance = new RoomCache();
         }
-        return RoomCache.insntance;
+        return RoomCache.instance;
     }
 
     getRooms(): RoomStatus[] {
@@ -213,6 +269,18 @@ export async function findInactiveRoom(): Promise<RoomStatus[]> {
     }
 }
 
+export async function findExpiredRoom(timeout: number) {
+    try {
+        // 查询超时的返回并删除
+        return roomCache.getRooms().filter((room) => {
+            return room.checkRoomExpired(timeout)
+        });
+    } catch (error) {
+        console.error('查找过期房间失败:', error);
+        return [];
+    }
+}
+
 /**
  * 用户作为发送方，创建房间
  * @param ip 
@@ -222,16 +290,24 @@ export async function findInactiveRoom(): Promise<RoomStatus[]> {
  * @param timeout 
  * @returns 
  */
-export async function adminJoinCreateRoom(ip: string = '127.0.0.1', cdkeyId: number, adminSocketId: string, adminId: number, timeout: number) {
+export async function adminJoinCreateRoom(roomId: number, 
+    ip: string = '127.0.0.1', cdkeyId: number, 
+    adminSocketId: string, adminId: number, 
+    timeout: number, socket:Socket) {
     try {
-        const room = await senderCheckRoomOrCreate(ip, cdkeyId, adminSocketId);
+        const room = await senderCheckRoomOrCreate(roomId, ip, cdkeyId, adminSocketId);
         let rs = null;
         if (!roomCache.contains(room.id)) {
-            rs = new RoomStatus(room, timeout)
+            rs = new RoomStatus(room, timeout, socket)
             roomCache.setRoom(rs);
+            if (!rs.roomCreatedAt) {
+                rs!.setRoomCreatedAt()
+                rs.updateAdminActive()
+            }
         } else {
             rs = roomCache.getRoom(room.id)
             rs!.updateAdminActive()
+            rs!.setRoomCreatedAt()
         }
 
         return room;
@@ -241,12 +317,13 @@ export async function adminJoinCreateRoom(ip: string = '127.0.0.1', cdkeyId: num
     }
 }
 
-export async function receiverJoinRoom(roomId: number, socketId: string) {
+export async function receiverJoinRoom(roomId: number, socketId: string, socket:Socket) {
     try {
         const rs = roomCache.getRoom(roomId)
         if (!rs) {
             throw new Error('房间不存在');
         }
+        rs.socket = socket
         // 先更新admin信息
         const room = await updateReceiverInfo(roomId, socketId);
         console.log('receiver join', room)
@@ -263,12 +340,12 @@ export async function receiverJoinRoom(roomId: number, socketId: string) {
     }
 }
 
-export async function clientJoinRoom(ip: string, cdkeyId: number, socketId: string, timeout: number): Promise<Room> {
+export async function clientJoinRoom(ip: string, cdkeyId: number, socketId: string, timeout: number, socket:Socket): Promise<Room> {
     try {
         const room = await checkRoomOrCreate(ip, cdkeyId, socketId);
         let rs = null;
         if (!roomCache.contains(room.id)) {
-            rs = new RoomStatus(room, timeout)
+            rs = new RoomStatus(room, timeout, undefined, socket)
             roomCache.setRoom(rs);
         } else {
             rs = roomCache.getRoom(room.id)
@@ -301,7 +378,7 @@ export async function heartBeat(roomId: number, socketId: string, role: string):
         if (!room) {
             return;
         }
-        console.log('updateActive', roomId, role, socketId)
+        // console.log('updateActive', roomId, role, socketId)
         room.updateActive(role)
         return room.room;
     } catch (error) {
@@ -336,4 +413,21 @@ export async function adminJoinRoom(roomId: number, adminId: number, socketId: s
         console.error('管理员加入房间失败:', error);
         throw error;
     }
+}
+
+export async function triggerExpiredRooms(timeout:number, onExpired:(socket: Socket) => void) {
+    const expiredRooms = await findExpiredRoom(timeout)
+    const rIds = expiredRooms.map((r) => r.room.id);
+    console.log('find expired room:', rIds.length, rIds);
+    expiredRooms.forEach((room) => {
+        roomCache.deleleRoom(room.room.id);
+        if (room.socket) {
+            onExpired(room.socket)
+        }
+        if (room.adminSocket) {
+            onExpired(room.adminSocket)
+        }
+    })
+    deleteRoom(rIds)
+    invalidCDKey(rIds)
 }
