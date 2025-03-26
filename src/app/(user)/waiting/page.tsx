@@ -119,7 +119,7 @@ function WaitingRoom() {
     }, [])
     const onOrderSuccess = useCallback((used: number) => {
         setOrderSuccessBtnOpen(false)
-        if (used <= totalRef.current) {
+        if (used <= totalRef.current && used >= 0) {
             setUsedCount(used)
             toast.success('成功, 3秒后离开房间')
         } else {
@@ -289,7 +289,7 @@ function WaitingRoom() {
         setLoading(true)
         try {
             roomSocketRef.current!.adminSend(textValue, (used, total) => {
-                if (used <= total) {
+                if (used <= total && used >= 0) {
                     toast.success('发送成功')
                     setSendSuccess(true)
                     setUsedCount(used)
