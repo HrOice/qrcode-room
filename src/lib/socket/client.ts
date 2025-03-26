@@ -13,7 +13,7 @@ export class RoomSocket {
     private onDisconnected?: () => void
 
     // user使用cdKey，学生不用
-    constructor(token: string,roomId?:number, onDisconnected?: () => void) {
+    constructor(token: string, roomId?: number, onDisconnected?: () => void) {
         // 添加 auth 选项，socket.io-client 会自动携带 cookie
         this.token = token;
         this.onDisconnected = onDisconnected;
@@ -43,17 +43,17 @@ export class RoomSocket {
                 // 可以在这里处理未授权的情况，比如跳转到登录页
                 setTimeout(() => {
                     window.location.href = '/login'
-                },2000)
+                }, 2000)
             } else if (error.message === 'cdkey.invalid') {
                 console.error('sender Authentication failed')
                 toast.error('卡密不存在或者失效，请检查')
                 // 可以在这里处理未授权的情况，比如跳转到登录页
                 setTimeout(() => {
                     window.location.href = '/login'
-                },2000)
+                }, 2000)
             } else {
                 console.error('uncaught error', error)
-                toast.error(error?.message||'加入失败')
+                toast.error(error?.message || '加入失败')
                 this.socket.disconnect()
                 this.onDisconnected?.()
             }
@@ -140,7 +140,7 @@ export class RoomSocket {
             console.log('admin left ')
             onSenderLeft()
         })
-        this.socket.on('admin-send', (data, used,total, cb) => {
+        this.socket.on('admin-send', (data, used, total, cb) => {
             debugger
             onReceiveImg(data, used, total)
             cb()
@@ -153,7 +153,7 @@ export class RoomSocket {
         this.socket.on('sender-success', onSenderSuccess)
 
         // 加入房间
-        this.socket.emit('receiver-join', { ip:'null', key: this.token, roomId },
+        this.socket.emit('receiver-join', { ip: 'null', key: this.token, roomId },
             (response: { roomId: number, ready: boolean, online: boolean, used: number, total: number }) => {
                 const { roomId, ready, online, used, total } = response
                 this.roomId = roomId
@@ -195,10 +195,10 @@ export class RoomSocket {
         onUserReady: (ready: boolean) => void,
         onUserLeft: () => void,
         onStatus: () => { ready: boolean },
-        onJoinRoom: (roomId: number, receiverReady: boolean, receiverOnline: boolean, roomCreatedAt:string, roomExpired: number) => void,
+        onJoinRoom: (roomId: number, receiverReady: boolean, receiverOnline: boolean, roomCreatedAt: string, roomExpired: number) => void,
         _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void,
         onUserJoin: () => void,
-        onReceiverSuccess: (used:number, total: number) => void,
+        onReceiverSuccess: (used: number, total: number) => void,
     ) {
 
         this.socket.emit('sender-join', { ip: '127.0.0.1' }, (response: { roomId: number, ready: boolean, online: boolean, roomCreatedAt: string, roomExpired: number }) => {
@@ -239,15 +239,19 @@ export class RoomSocket {
 
     async senderSuccess(onSuccess: (used: number, total: number) => void) {
         this.socket.emit('sender-success', (used: number, total: number) => {
-           // 发送者点击成功
-           onSuccess(used, total)
+            // 发送者点击成功
+            onSuccess(used, total)
         })
     }
 
-    async receiverSuccess(onSuccess: () => void) {
-        this.socket.emit('receiver-success', () => {
-           // 发送者点击成功
-           onSuccess()
+    async receiverSuccess(success: boolean, onSuccess: () => void, onFail: ()=>void) {
+        this.socket.emit('receiver-success', success, () => {
+            // 发送者点击成功
+            if (success) {
+                onSuccess()
+            } else {
+                onFail()
+            }
         })
     }
 

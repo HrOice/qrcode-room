@@ -54,7 +54,58 @@ function WaitingRoom() {
     // 添加倒计时状态
     const [countdown, setCountdown] = useState<string>('')
     const countdownIntervalRef = useRef<NodeJS.Timer | null>(null)
-    const totalRef =  useRef(0)
+    const totalRef = useRef(0)
+    const [receiverCallback, setReceiverCallback] = useState('')
+
+    const notifyAudioRef = useRef<HTMLAudioElement | null>(null)
+    useEffect(() => {
+        notifyAudioRef.current = new Audio('/sounds/sounds.mp3')
+        if (notifyAudioRef.current) {
+            notifyAudioRef.current.volume = 0.5
+            notifyAudioRef.current.preload = 'auto'
+        }
+    }, [])
+    // 添加用户交互检测
+    useEffect(() => {
+        const handleInteraction = () => {
+            // 用户首次交互时预加载音频
+            if (notifyAudioRef.current) {
+                notifyAudioRef.current.load()
+            }
+        }
+
+        // 监听用户交互事件
+        document.addEventListener('click', handleInteraction)
+        document.addEventListener('touchstart', handleInteraction)
+
+        return () => {
+            document.removeEventListener('click', handleInteraction)
+            document.removeEventListener('touchstart', handleInteraction)
+        }
+    }, [])
+    // 修改播放函数
+    const playNotifySound = useCallback(() => {
+        if (!notifyAudioRef.current) return
+
+        // 尝试播放
+        const playPromise = notifyAudioRef.current.play()
+
+        if (playPromise !== undefined) {
+            playPromise
+                .then(() => {
+                    // 播放成功
+                    notifyAudioRef.current!.currentTime = 0
+                })
+                .catch(error => {
+                    // 如果是自动播放限制导致的错误，静默处理
+                    if (error.name === 'NotAllowedError') {
+                        console.log('需要用户交互才能播放音频')
+                    } else {
+                        console.error('播放提示音失败:', error)
+                    }
+                })
+        }
+    }, [])
     // 添加倒计时处理函数
     const startCountdown = useCallback((roomCreatedAt: string, roomExpired: number) => {
         const updateCountdown = () => {
@@ -94,7 +145,7 @@ function WaitingRoom() {
     }, [isReady])
     // 获取房间详情
     const fetchRoomDetail = useCallback(async () => {
-        if(roomId == 0) {
+        if (roomId == 0) {
             return;
         }
         const { room } = await roomApi.getRoom(roomId)
@@ -153,6 +204,7 @@ function WaitingRoom() {
             roomSocket.senderJoin(
                 () => {
                     setUserReady(true)
+                    playNotifySound()
                 },
                 () => {
                     toast.success('用户已离开房间')
@@ -171,6 +223,7 @@ function WaitingRoom() {
                     fetchRoomDetail()
                     setUserReady(ready);
                     setUserOnline(online)
+                    // setIsReady(true)
                 }, (param) => {
                     const { online, ready } = param
                     setUserOnline(online)
@@ -180,8 +233,15 @@ function WaitingRoom() {
                     setUserReady(false)
                     setIsReady(false)
                     setSendSuccess(false)
-                }, (used) => {
-                    onOrderSuccess(used)
+                }, (used, success) => {
+                    if (success) {
+                        setReceiverCallback('成功')
+                        onOrderSuccess(used)
+                    } else {
+                        toast.error('接收者反馈失败')
+                        setReceiverCallback('未成功')
+                    }
+                    playNotifySound()
                 }
             )
 
@@ -199,7 +259,7 @@ function WaitingRoom() {
                 clearInterval(countdownIntervalRef.current as NodeJS.Timeout)
             }
         }
-    }, [roomId, router, fetchRoomDetail, reconnectKey, searchParams, resetStatus, onOrderSuccess, startCountdown])
+    }, [roomId, router, fetchRoomDetail, reconnectKey, searchParams, resetStatus, onOrderSuccess, startCountdown, playNotifySound])
 
     // 处理准备状态
     const handleReady = () => {
@@ -540,6 +600,9 @@ function WaitingRoom() {
                 <div className="text-sm text-gray-600">
                     剩余使用次数: {room.cdkey.total - usedCount}/{room.cdkey.total}
                 </div>
+                {sendSuccess && <div className="text-sm text-red-600">
+                    接收者反馈状态: {receiverCallback}
+                </div>}
             </div>
             {/* 重连按钮 */}
             {reconnect && (

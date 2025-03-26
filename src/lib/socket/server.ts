@@ -7,8 +7,6 @@ import {
   adminJoinCreateRoom,
   adminJoinRoom,
   clientJoinRoom,
-  deleteRoom,
-  findInactiveRoom,
   getRoom,
   heartBeat,
   receiverJoinRoom,
@@ -140,11 +138,11 @@ export function createSocketServer(server: any) {
 
   // 检查断线的房间
   setInterval(async () => {
-    const inactiveRooms = await findInactiveRoom()
-    if (inactiveRooms.length > 0) {
-      console.log('inactiveRooms, ', inactiveRooms);
-    }
-    await deleteRoom(inactiveRooms.map(r => r.room.id))
+    // const inactiveRooms = await findInactiveRoom()
+    // if (inactiveRooms.length > 0) {
+    //   console.log('inactiveRooms, ', inactiveRooms);
+    // }
+    // await deleteRoom(inactiveRooms.map(r => r.room.id))
 
     // 查询剩余房间，清理数据库不存在的房间
     const activeRooms = await roomCache.getRooms();
@@ -152,7 +150,7 @@ export function createSocketServer(server: any) {
     cleanUnactiveRoom(activeIds)
 
     // 检查roomCreatedAt，如果超过30分钟，清除掉并失效cdkey
-    triggerExpiredRooms(ROOM_EXPIRED, (socket:Socket) => {
+    triggerExpiredRooms(ROOM_EXPIRED, (socket: Socket) => {
       console.log('room-expired', socket.data.roomId, socket.id)
       socket.emit('room-expired', () => {
         socket.disconnect()
@@ -264,13 +262,19 @@ function handleHeartBeat(socket: Socket) {
 }
 
 function handleReceiverSuccess(socket: Socket) {
-  socket.on('receiver-success', async (cb) => {
-    console.log('receiver-success1', socket.data.roomId, socket.id);
-    const used = await useCDKey(socket.data.roomId, '127.0.0.1', -1);
-    socket.to(String(socket.data.roomId)).emit('receiver-success', used);
+  socket.on('receiver-success', async (success, cb) => {
+    console.log('receiver-success1', success, socket.data.roomId, socket.id);
+    if (success) {
+      const used = await useCDKey(socket.data.roomId, '127.0.0.1', -1);
+      socket.to(String(socket.data.roomId)).emit('receiver-success', used, true);
+    } else {
+      socket.to(String(socket.data.roomId)).emit('receiver-success', 0, false);
+    }
     cb()
-    const rs = roomCache.getRoom(socket.data.roomId);
-    rs?.resetRoomCreatedAt()
+    if (success) {
+      const rs = roomCache.getRoom(socket.data.roomId);
+      rs?.resetRoomCreatedAt()
+    }
   });
 }
 

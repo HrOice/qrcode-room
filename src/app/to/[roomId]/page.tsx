@@ -23,6 +23,7 @@ function WaitingContent() {
     const readyRef = useRef(false)  // 添加 ref 来跟踪最新状态
     const [reveivedUrl, setReveivedUrl] = useState('')
     const [orderSuccessBtnOpen, setOrderSuccessBtnOpen] = useState(false)
+    const [orderFailBtnOpen, setOrderFailBtnOpen] = useState(false)
     const [sendSuccess, setSendSuccess] = useState(false)
 
     const roomSocketRef = useRef<RoomSocket | null>(null)
@@ -78,6 +79,11 @@ function WaitingContent() {
             }, (data) => {
                 setReveivedUrl(data)
                 setSendSuccess(true)
+                setTimeout(() => {
+                    if (window) {
+                        window.open(data, '_blank')
+                    }
+                }, 500)
                 // setUsedCount(used)
             }, () => {
                 const currentReady = readyRef.current;  // 记录当前状态以便调试
@@ -122,11 +128,14 @@ function WaitingContent() {
         router.replace("/login")
     }
 
-    const handleOrderSuccess = async () => {
+    const handleOrderSuccess = async (success: boolean) => {
         setOrderSuccessBtnOpen(false)
+        setOrderFailBtnOpen(false)
         try {
-            await roomSocketRef.current!.receiverSuccess(() => {
+            await roomSocketRef.current!.receiverSuccess(success, () => {
                 onOrderSuccess()
+            }, () => {
+                // 失败显示失败提示，
             })
         } catch (error) {
             console.error(error)
@@ -194,7 +203,8 @@ function WaitingContent() {
                                             >
                                                 打开链接
                                             </Button>
-                                            {sendSuccess && (<><Button
+                                            <div className="pt-6 w-full"  ></div>
+                                            {sendSuccess && (<div className='flex  w-full space-x-1'><Button
                                                 block
                                                 type="info"
                                                 disabled={!sendSuccess}
@@ -204,15 +214,37 @@ function WaitingContent() {
                                             >
                                                 成功
                                             </Button>
+                                            <div className="pt-6 w-2.5"  ></div>
+
+                                                <Button
+                                                    block
+                                                    type="warning"
+                                                    disabled={!sendSuccess}
+                                                    onClick={() => {
+                                                        setOrderFailBtnOpen(true)
+                                                    }}
+                                                >
+                                                    未成功
+                                                </Button>
                                                 <ConfirmDialog
                                                     open={orderSuccessBtnOpen}
                                                     title="确认成功？"
                                                     content="确认成功？"
                                                     confirmText="确认"
                                                     confirmType="primary"
-                                                    onConfirm={handleOrderSuccess}
+                                                    onConfirm={() => handleOrderSuccess(true)}
                                                     onCancel={() => setOrderSuccessBtnOpen(false)}
-                                                /></>)}
+                                                />
+                                                <ConfirmDialog
+                                                    open={orderFailBtnOpen}
+                                                    title="确认未成功？"
+                                                    content="确认未成功？"
+                                                    confirmText="确认"
+                                                    confirmType="primary"
+                                                    onConfirm={() => handleOrderSuccess(false)}
+                                                    onCancel={() => setOrderFailBtnOpen(false)}
+                                                />
+                                            </div>)}
                                         </div>
                                     ) : (
                                         <div className="text-gray-400">
