@@ -231,7 +231,7 @@ function WaitingRoom() {
                 }, () => {
                     setUserOnline(true)
                     setUserReady(false)
-                    setIsReady(false)
+                    // setIsReady(false)
                     setSendSuccess(false)
                 }, (used, success) => {
                     if (success) {
@@ -747,7 +747,7 @@ function WaitingRoom() {
                         </div>
                         <Button
                             type={isReady ? 'info' : 'primary'}
-                            disabled={isReady || !userOnline} // 用户不在线时禁用准备按钮
+                            disabled={isReady } // 用户不在线时禁用准备按钮
                             onClick={handleReady}
                         >
                             {isReady ? '已准备' : '准备'}
