@@ -9,6 +9,8 @@ import jsQR from 'jsqr'
 import QRCode from 'qrcode'
 
 import ConfirmDialog from '@/components/ConfirmDialog'
+import { useNotifySound } from '@/hooks/useNotifySound'
+import { useQRScanner } from '@/hooks/useQRScanner'
 import { copyToClipboard } from '@/lib/utils/clipboard'
 import { generateQR, generateQRWithText } from '@/lib/utils/qrcode'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
@@ -42,14 +44,12 @@ function WaitingRoom() {
     const [leaveModalOpen, setLeaveModalOpen] = useState(false)
     const readyRef = useRef(false)  // 添加 ref 来跟踪最新状态'
     const [usedCount, setUsedCount] = useState(0)
-    const [showCamera, setShowCamera] = useState(false)
-    const videoRef = useRef<HTMLVideoElement>(null)
-    const streamRef = useRef<MediaStream | null>(null)
+
     const [roomId, setRoomId] = useState(0)
     const [showRoomQR, setShowRoomQR] = useState(false)
     const [roomQRCode, setRoomQRCode] = useState('')
     const [sendSuccess, setSendSuccess] = useState(false)
-    const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
     const [orderSuccessBtnOpen, setOrderSuccessBtnOpen] = useState(false)
     // 添加倒计时状态
     const [countdown, setCountdown] = useState<string>('')
@@ -57,55 +57,10 @@ function WaitingRoom() {
     const totalRef = useRef(0)
     const [receiverCallback, setReceiverCallback] = useState('')
 
-    const notifyAudioRef = useRef<HTMLAudioElement | null>(null)
-    useEffect(() => {
-        notifyAudioRef.current = new Audio('/sounds/sounds.mp3')
-        if (notifyAudioRef.current) {
-            notifyAudioRef.current.volume = 0.5
-            notifyAudioRef.current.preload = 'auto'
-        }
-    }, [])
-    // 添加用户交互检测
-    useEffect(() => {
-        const handleInteraction = () => {
-            // 用户首次交互时预加载音频
-            if (notifyAudioRef.current) {
-                notifyAudioRef.current.load()
-            }
-        }
-
-        // 监听用户交互事件
-        document.addEventListener('click', handleInteraction)
-        document.addEventListener('touchstart', handleInteraction)
-
-        return () => {
-            document.removeEventListener('click', handleInteraction)
-            document.removeEventListener('touchstart', handleInteraction)
-        }
-    }, [])
-    // 修改播放函数
-    const playNotifySound = useCallback(() => {
-        if (!notifyAudioRef.current) return
-
-        // 尝试播放
-        const playPromise = notifyAudioRef.current.play()
-
-        if (playPromise !== undefined) {
-            playPromise
-                .then(() => {
-                    // 播放成功
-                    notifyAudioRef.current!.currentTime = 0
-                })
-                .catch(error => {
-                    // 如果是自动播放限制导致的错误，静默处理
-                    if (error.name === 'NotAllowedError') {
-                        console.log('需要用户交互才能播放音频')
-                    } else {
-                        console.error('播放提示音失败:', error)
-                    }
-                })
-        }
-    }, [])
+    const playNotifySound = useNotifySound({
+        volume: 0.5,
+        soundUrl: '/sounds/sounds.mp3'
+    })
     // 添加倒计时处理函数
     const startCountdown = useCallback((roomCreatedAt: string, roomExpired: number) => {
         const updateCountdown = () => {
@@ -374,161 +329,24 @@ function WaitingRoom() {
         router.push('/login')
     }
 
-    const startCamera = async () => {
-        try {
-            // return;
-            if (!navigator.mediaDevices?.getUserMedia) {
-                toast.error('您的浏览器不支持访问相机')
-                return
-            }
-            setShowCamera(true)
-
-            // 使用现代 API
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                }
+    const { showCamera, videoRef, startCamera, stopCamera } = useQRScanner({
+        onSuccess: async (text) => {
+            setTextValue(text)
+            const qrDataUrl = await generateQR(text)
+            setQrCodeData({
+                url: qrDataUrl,
+                type: 'text'
             })
-            // 检查 video 元素是否存在
-            if (!videoRef.current) {
-                console.error('video 元素未找到')
-                setShowCamera(false)
-                return
-            }
-
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream
-                videoRef.current.onloadedmetadata = () => {
-                    videoRef.current?.play() // 确保视频开始播放
-                        .catch(error => {
-                            console.error('视频播放失败:', error)
-                            toast.error('相机启动失败，请重试')
-                            setShowCamera(false)
-                        })
-                }
-                streamRef.current = stream
-                console.log('相机已启动') // 调试日志
-                toast.success('相机已启动')
-                startScanning()
-            }
-        } catch (err) {
-            console.error('相机启动失败:', err)
-            let errorMessage = '无法访问相机'
-            setShowCamera(false)
-            // 根据具体错误类型显示不同提示
-            if (err instanceof Error) {
-                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                    errorMessage = '请允许访问相机权限'
-                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-                    errorMessage = '未找到可用的相机设备'
-                } else if (err.name === 'NotSupportedError') {
-                    errorMessage = '您的浏览器不支持访问相机'
-                } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-                    errorMessage = '相机设备被占用或无法访问'
-                }
-            }
-
-            toast.error(errorMessage + err)
+            toast.success('已识别二维码')
         }
-    }
+    })
 
-    // 添加开始扫描函数
-    const startScanning = () => {
-        // 每 200ms 扫描一次
-        const interval = setInterval(scanQRCode, 200)
-        // 保存 interval id 以便清理
-        scanIntervalRef.current = interval
-    }
-
-    // 修改停止相机函数
-    const stopCamera = useCallback(() => {
-        console.log('stop camera')
-        // 清理扫描定时器
-        if (scanIntervalRef.current) {
-            clearInterval(scanIntervalRef.current)
-            scanIntervalRef.current = null
-        }
-
-        // 停止视频流
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop())
-            streamRef.current = null
-        }
-
-        setShowCamera(false)
-    }, [])
-    // 修改 scanQRCode 函数
-    // 使用 useCallback 包装 scanQRCode 函数
-    const scanQRCode = useCallback(() => {
-        if (!videoRef.current || !videoRef.current.videoWidth) return
-
-        const canvas = document.createElement('canvas')
-        const context = canvas.getContext('2d')
-        if (!context) return
-
-        // 使用实际视频尺寸
-        const { videoWidth, videoHeight } = videoRef.current
-        canvas.width = videoWidth
-        canvas.height = videoHeight
-
-        // 绘制当前视频帧
-        context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight)
-        const imageData = context.getImageData(0, 0, videoWidth, videoHeight)
-
-        try {
-            const code = jsQR(
-                imageData.data,
-                imageData.width,
-                imageData.height,
-                {
-                    inversionAttempts: "dontInvert",
-                }
-            )
-
-            if (code && code.data && code.data.trim()) {
-                setTextValue(code.data)
-                // 不带文字
-                generateQR(code.data).then(url => {
-                    setQrCodeData({
-                        url: url,
-                        type: 'text'
-                    })
-                    toast.success('已识别二维码')
-                    stopCamera()
-                })
-            }
-        } catch (error) {
-            console.error('扫描二维码出错:', error)
-        }
-    }, [stopCamera]) // 添加 stopCamera 作为依赖
-
-
-
-
-    // 在组件卸载时清理相机
+    // 清理相机相关的 useEffect
     useEffect(() => {
         return () => {
             stopCamera()
         }
     }, [stopCamera])
-
-    // 添加定时扫描逻辑
-    useEffect(() => {
-        let scanInterval: NodeJS.Timer | null = null;
-
-        if (showCamera && videoRef.current) {
-            // 每 500ms 扫描一次
-            scanInterval = setInterval(scanQRCode, 500);
-        }
-
-        return () => {
-            if (scanInterval) {
-                clearInterval(scanInterval as NodeJS.Timeout);
-            }
-        };
-    }, [showCamera, scanQRCode]);
 
     // 修改房间二维码生成
     const generateRoomQR = useCallback(async () => {
