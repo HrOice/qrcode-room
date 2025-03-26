@@ -4,7 +4,7 @@ import { randomBytes } from 'crypto';
 
 const CHAR_SET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const PREFIX_LENGTH = 6;  // 前缀长度
-const SEQUENCE_LENGTH = 5;  // 序号长度
+const SUFFIX_LENGTH = 6;  // 后缀长度
 
 function generateRandomPrefix(): string {
     const bytes = randomBytes(PREFIX_LENGTH);
@@ -14,13 +14,6 @@ function generateRandomPrefix(): string {
     }).join('');
 }
 
-function formatSequence(num: number): string {
-    return num.toString().padStart(SEQUENCE_LENGTH, '0');
-}
-
-function generateCDKeyWithSequence(prefix: string, sequence: number): string {
-    return `${prefix}-${formatSequence(sequence)}`;
-}
 
 /**
  * 创建cdkey
@@ -29,41 +22,46 @@ function generateCDKeyWithSequence(prefix: string, sequence: number): string {
  * @returns 
  */
 export async function createCDKeys(number: number, totalUse: number) {
-    // 生成一个随机前缀，所有key共用
-    const prefix = generateRandomPrefix();
+    try {
+        // 获取数据库最大 ID
+        const maxIdResult = await prisma.cDKey.findFirst({
+            orderBy: {
+                id: 'desc'
+            },
+            select: {
+                id: true
+            }
+        });
 
-    // 获取当前最大序号
-    const lastKey = await prisma.cDKey.findFirst({
-        orderBy: {
-            key: 'desc'
-        }
-    });
+        const startId = (maxIdResult?.id || 0) + 1;
+        const createdAt = new Date()
+        // 生成要创建的 keys
+        const keys = Array.from({ length: number }, (_, i) => {
+            const currentId = startId + i;
+            const prefix = generateRandomPrefix(); // 每个 key 生成新的前缀
+            const formattedId = currentId.toString().padStart(SUFFIX_LENGTH, '0');
+            
+            return {
+                key: `${prefix}-${formattedId}`,
+                used: 0,
+                total: totalUse,
+                status: 1,
+                createdAt: createdAt,
+                updatedAt: createdAt,
+            };
+        });
 
-    // 确定起始序号
-    let startSequence = 10001; // 默认起始值
-    if (lastKey?.key) {
-        const match = lastKey.key.match(/-(\d+)$/);
-        if (match) {
-            startSequence = parseInt(match[1]) + 1;
-        }
+        // 批量创建
+        await prisma.cDKey.createMany({
+            data: keys,
+        });
+
+        return keys;
+
+    } catch (error) {
+        console.error('创建 CDKey 失败:', error);
+        throw error;
     }
-
-    // 生成指定数量的key
-    const keys = Array.from({ length: number }, (_, i) => ({
-        key: generateCDKeyWithSequence(prefix, startSequence + i),
-        used: 0,
-        total: totalUse,
-        status: 1,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-    }));
-
-    // 批量创建
-    await prisma.cDKey.createMany({
-        data: keys,
-    });
-
-    return keys;
 }
 
 /**

@@ -719,7 +719,7 @@ function WaitingRoom() {
                         <ConfirmDialog
                             open={orderSuccessBtnOpen}
                             title="确认完成"
-                            content="确认成功后会扣减次数"
+                            content="确认成功？"
                             confirmText="确认成功"
                             confirmType="primary"
                             onConfirm={handleOrderSuccess}

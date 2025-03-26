@@ -255,11 +255,20 @@ export default function CDKeyPage() {
                             type="number"
                             value={String(addForm.number)}
                             onChange={(val) => {
-                                const num = parseInt(val);
+                                const num = val === '' ? 0 : parseInt(val);
                                 setAddForm(prev => ({
                                     ...prev,
-                                    number: isNaN(num) ? 1 : Math.max(1, num)
-                                }))
+                                    number: isNaN(num) ? 0 : num
+                                }));
+                            }}
+                            onBlur={() => {
+                                // 失去焦点时，如果值为0，设置为1
+                                if (addForm.number === 0) {
+                                    setAddForm(prev => ({
+                                        ...prev,
+                                        number: 1
+                                    }));
+                                }
                             }}
                             // min={1}
                         />
@@ -271,11 +280,20 @@ export default function CDKeyPage() {
                             type="number"
                             value={String(addForm.totalUse)}
                             onChange={(val) => {
-                                const num = parseInt(val)
+                                const num = val === '' ? 0 : parseInt(val);
                                 setAddForm(prev => ({
                                     ...prev,
-                                    totalUse: isNaN(num) ? 1 : Math.max(1, num)
-                                }))
+                                    totalUse: isNaN(num) ? 0 : num
+                                }));
+                            }}
+                            onBlur={() => {
+                                // 失去焦点时，如果值为0，设置为1
+                                if (addForm.totalUse === 0) {
+                                    setAddForm(prev => ({
+                                        ...prev,
+                                        totalUse: 1
+                                    }));
+                                }
                             }}
                             // min={1}
                         />
