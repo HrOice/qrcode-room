@@ -12,7 +12,7 @@ import ConfirmDialog from '@/components/ConfirmDialog'
 import { useNotifySound } from '@/hooks/useNotifySound'
 import { useQRScanner } from '@/hooks/useQRScanner'
 import { copyToClipboard } from '@/lib/utils/clipboard'
-import { generateQR, generateQRWithText } from '@/lib/utils/qrcode'
+import { generateQRWithText } from '@/lib/utils/qrcode'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { Qr } from '@react-vant/icons'
 import Image from 'next/image'
@@ -231,9 +231,9 @@ function WaitingRoom() {
             setTextValue(text)
             if (text) {
                 // 不带文字
-                const qrDataUrl = await generateQR(text)  // 添加中心文本
+                // const qrDataUrl = await generateQR(text)  // 添加中心文本
                 setQrCodeData({
-                    url: qrDataUrl,
+                    url: '',
                     type: 'text'
                 })
             } else {
@@ -332,9 +332,9 @@ function WaitingRoom() {
     const { showCamera, videoRef, startCamera, stopCamera } = useQRScanner({
         onSuccess: async (text) => {
             setTextValue(text)
-            const qrDataUrl = await generateQR(text)
+            // const qrDataUrl = await generateQR(text)
             setQrCodeData({
-                url: qrDataUrl,
+                url: '',
                 type: 'text'
             })
             toast.success('已识别二维码')
@@ -447,62 +447,22 @@ function WaitingRoom() {
                     />
 
                     {/* 合并的图片上传和预览区域 */}
-                    <div className="space-y-4">  {/* 修改 space-y-2 为 space-y-4 增加间距 */}
+                    <div className="space-y-4">
                         <div className="text-sm text-gray-500">
-                            {qrCodeData?.type === 'text' ? '生成的二维码' : '上传二维码图片自动识别内容'}
+                            上传或扫描二维码识别内容
                         </div>
-                        <div className="aspect-square w-full max-w-sm mx-auto border-2 border-dashed border-gray-200 rounded-lg flex items-center justify-center relative">
-                            {qrCodeData ? (
-                                // 预览区域
-                                <div className="relative group w-full h-full">
-                                    <Image
-                                        src={qrCodeData.url}
-                                        width="100"
-                                        height="100"
-                                        alt="QR Code"
-                                        className="w-full h-full object-contain p-4"
-                                    />
-                                    {/* 悬停时显示的上传覆盖层 */}
-                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <Uploader
-                                            value={qrCodeData?.type === 'image' ? [{ url: qrCodeData.url }] : []}
-                                            onChange={handleImageUpload}
-                                            previewFullImage={false}
-                                            multiple={false}
-                                            maxCount={1}
-                                            className="!block"
-                                        >
-                                            <div className="text-white text-sm">
-                                                点击更换图片
-                                            </div>
-                                        </Uploader>
-                                        <Button
-                                            size="small"
-                                            type="danger"
-                                            onClick={handleClear}
-                                        >
-                                            清空内容
-                                        </Button>
-                                    </div>
-                                </div>
-                            ) : (
-                                // 初始上传区域
-                                <Uploader
-                                    value={[]}
-                                    onChange={handleImageUpload}
-                                    multiple={false}
-                                    maxCount={1}
-                                    previewFullImage={false}
-                                >
-                                    <div className="text-gray-400 text-sm text-center p-4">
-                                        <div>点击上传二维码图片</div>
-                                        <div className="mt-1">或输入文本自动生成</div>
-                                    </div>
-                                </Uploader>
-                            )}
-                        </div>
-                        {/* 将扫码按钮移到这里 */}
-                        <div className="flex justify-center">
+                        <div className=" mx-auto border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center gap-4">
+                            <Uploader
+                                onChange={handleImageUpload}
+                                multiple={false}
+                                maxCount={1}
+                                previewFullImage={false}
+                            >
+                                <Button>
+                                    点击此处上传图片
+                                </Button>
+                            </Uploader>
+
                             <Button
                                 icon={<Qr />}
                                 onClick={(e) => {
@@ -565,7 +525,7 @@ function WaitingRoom() {
                         </div>
                         <Button
                             type={isReady ? 'info' : 'primary'}
-                            disabled={isReady } // 用户不在线时禁用准备按钮
+                            disabled={isReady} // 用户不在线时禁用准备按钮
                             onClick={handleReady}
                         >
                             {isReady ? '已准备' : '准备'}
