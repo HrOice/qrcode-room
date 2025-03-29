@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Server, Socket } from 'socket.io';
+import { v4 as uuidv4 } from 'uuid';
 import { useCDKey, validCDKey } from '../service/CDkeyService';
-import { cleanUnactiveRoom } from '../service/RoomService';
+// import { cleanUnactiveRoom } from '../service/RoomService';
 
 import {
   adminJoinCreateRoom,
@@ -22,6 +23,7 @@ const TIMEOUT_MS = 60000
 interface StatusResponse {
   online: boolean;
   ready: boolean;
+  selfReady: boolean;
 }
 export async function checkStatus(
   socket: Socket,
@@ -30,33 +32,45 @@ export async function checkStatus(
   timeout: number = 1000
 ): Promise<StatusResponse> {
   try {
-    const status = await Promise.race([
-      new Promise<boolean>((resolve, reject) => {
-        socket.to(String(roomId)).timeout(timeout).emit('status', (err: any, args: any) => {
-          if (err) {
-            reject(new Error('Status check timeout'));
-            return;
-          }
-          // args[0] 是实际的响应数据
-          const response = args[0];
-          resolve(response?.ready || false);
-        });
-      }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Status check timeout')), timeout)
-      )
-    ]);
 
-    console.log('check status result:', status, isOnline());
-    return {
-      online: isOnline(),
-      ready: !!status
-    };
+    const rs = roomCache.getRoom(roomId);
+    if (socket.data.role === 'client') {
+      const senderStatus = await Promise.race([
+        new Promise<boolean>((resolve, reject) => {
+          socket.to(String(roomId)).timeout(timeout).emit('status', (err: any, args: any) => {
+            if (err) {
+              reject(new Error('Status check timeout'));
+              return;
+            }
+            // args[0] 是实际的响应数据
+            const response = args[0];
+            resolve(response?.ready || false);
+          });
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Status check timeout')), timeout)
+        )
+      ]);
+      console.log('check status for receiver result:', senderStatus, isOnline(), rs!.receiverReady);
+      return {
+        online: isOnline(),
+        ready: !!senderStatus,
+        selfReady: rs!.receiverReady
+      };
+    } else {
+      console.log('check status for sender result:', isOnline(), rs!.receiverReady);
+      return {
+        online: isOnline(),
+        ready: rs!.receiverReady,
+        selfReady: false // 无用
+      };
+    }
   } catch (error) {
     console.error('Status check failed:', error);
     return {
       online: false,
-      ready: false
+      ready: false,
+      selfReady: false
     };
   }
 }
@@ -81,6 +95,32 @@ async function checkClientStatus(socket: Socket) {
   }
 
   return checkStatus(socket, roomId, () => room.isClientOnline());
+}
+
+function genCookie(socket: Socket) {
+  const cookieValue = `room_${uuidv4()}`
+  socket.handshake.headers.cookie = `room_auth=${cookieValue}`
+  socket.emit('set_cookie', {
+    name: 'room_auth',
+    value: cookieValue,
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
+  })
+  return cookieValue
+}
+
+function getCookieValue(socket: Socket, key: string): string | undefined {
+  const cookies = socket.handshake.headers.cookie
+  if (!cookies) return undefined
+
+  // 解析 cookie 字符串
+  const cookieMap = cookies.split(';')
+    .map(cookie => cookie.trim().split('='))
+    .reduce((acc, [key, value]) => {
+      acc[key] = value
+      return acc
+    }, {} as { [key: string]: string })
+
+  return cookieMap[key]
 }
 
 
@@ -110,6 +150,19 @@ export function createSocketServer(server: any) {
             return next(new Error('房间不能进入，已有接收者'))
           }
         }
+        // 检查cookie
+        if (rs.receiverToken) {
+          // 有cookie要检查
+          const roomAuthToken = getCookieValue(socket, 'room_auth')
+          if (roomAuthToken !== rs.receiverToken) {
+            return next(new Error('房间不能进入，已有接收者'))
+          }
+        } else {
+          // 生成学生端 cookie
+          const cookieValue = genCookie(socket)
+          rs.receiverToken = cookieValue
+        }
+
       } else {
         // 验证 valid_key
         const { id, key, valid, used, total } = await validCDKey(token);
@@ -127,6 +180,17 @@ export function createSocketServer(server: any) {
         socket.data.used = used
         socket.data.total = total
         socket.data.roomId = id //使用cdkeyId作为房间id
+        const rs = roomCache.getRoom(id!)
+        if (rs) {
+          // 检查cookie
+          if (rs.senderToken) {
+            // 有cookie要检查
+            const roomAuthToken = getCookieValue(socket, 'room_auth')
+            if (roomAuthToken !== rs.senderToken) {
+              return next(new Error('房间不能进入，已有发送者'))
+            }
+          }
+        }
       }
       next()
     } catch (error) {
@@ -145,9 +209,9 @@ export function createSocketServer(server: any) {
     // await deleteRoom(inactiveRooms.map(r => r.room.id))
 
     // 查询剩余房间，清理数据库不存在的房间
-    const activeRooms = await roomCache.getRooms();
-    const activeIds = activeRooms.map(t => t.room.id)
-    cleanUnactiveRoom(activeIds)
+    // const activeRooms = await roomCache.getRooms();
+    // const activeIds = activeRooms.map(t => t.room.id)
+    // cleanUnactiveRoom(activeIds)
 
     // 检查roomCreatedAt，如果超过30分钟，清除掉并失效cdkey
     triggerExpiredRooms(ROOM_EXPIRED, (socket: Socket) => {
@@ -200,10 +264,10 @@ export function createSocketServer(server: any) {
       const rs = roomCache.getRoom(roomId);
       console.log('Client disconnected:', roomId, socket.id, socket.data.role)
       if (socket.data.role === 'admin') {
-        socket.to(String(roomId)).emit('admin-left')
+        // socket.to(String(roomId)).emit('admin-left')
         rs?.cancelAdminSocketId(socket.id)
       } else {
-        socket.to(String(roomId)).emit('user-left')
+        // socket.to(String(roomId)).emit('user-left')
         rs?.cancelSocketId(socket.id);
       }
     })
@@ -274,6 +338,7 @@ function handleReceiverSuccess(socket: Socket) {
     if (success) {
       const rs = roomCache.getRoom(socket.data.roomId);
       rs?.resetRoomCreatedAt()
+      rs?.resetRoomInfo()
     }
   });
 }
@@ -287,6 +352,7 @@ function handleSenderSuccess(socket: Socket) {
     cb(used);
     const rs = roomCache.getRoom(socket.data.roomId);
     rs?.resetRoomCreatedAt()
+    rs?.resetRoomInfo()
   });
 }
 
@@ -299,6 +365,8 @@ function handleAdminSend(socket: Socket) {
       cb(-1);
       return;
     }
+    const rs = roomCache.getRoom(roomId)
+    rs!.setData(data);
     socket.to(String(roomId)).emit('admin-send', data, used! + 1, total, async () => {
       // 发送成功减次数
       console.log('send success........', roomId, data.length);
@@ -312,6 +380,8 @@ function handleAdminReady(socket: Socket) {
   socket.on('admin-ready', async (ready, cb) => {
     const roomId = socket.data.roomId;
     console.log('admin-ready', ready);
+    const rs = roomCache.getRoom(roomId)
+    rs!.senderReady = true
     socket.to(String(roomId)).emit('admin-ready', ready);
     cb(ready);
   });
@@ -321,6 +391,8 @@ function handleUserReady(socket: Socket) {
   socket.on('user-ready', async (ready, cb) => {
     const roomId = socket.data.roomId;
     console.log('user-ready', ready);
+    const rs = roomCache.getRoom(roomId)
+    rs!.receiverReady = true
     socket.to(String(roomId)).emit('user-ready', ready);
     cb(ready);
   });
@@ -385,7 +457,8 @@ function handleReceiverJoin(socket: Socket) {
       socket.to(String(roomId)).emit('receiver-join', { roomId });
       const adminStatus = await checkAdminStatus(socket);
       console.log('receiver-join', roomId, adminStatus);
-      cb({ roomId: roomId, ...adminStatus });
+      const rs = roomCache.getRoom(roomId);
+      cb({ roomId: roomId, ...adminStatus, data: rs!.data, dataCreatedAt: rs!.dataCreatedAt});
     } catch (error) {
       console.error(error);
       socket.emit('error', { message: 'receiver加入房间失败' });
@@ -416,6 +489,10 @@ function handleSenderJoin(socket: Socket, TIMEOUT_MS: number) {
           socket.disconnect();
           return;
         }
+        else {
+          const cookieValue = genCookie(socket)
+          rs.senderToken = cookieValue
+        }
       }
       socket.data.roomId = room.id;
       socket.join(String(room.id));
@@ -423,7 +500,7 @@ function handleSenderJoin(socket: Socket, TIMEOUT_MS: number) {
       socket.to(String(room.id)).emit('sender-join', { roomId: room.id });
       // 要检查的状态，是否在线，是否准备
       const clientStatus = await checkClientStatus(socket);
-      cb({ roomId: room.id, roomCreatedAt: rs.roomCreatedAt, roomExpired: ROOM_EXPIRED, ...clientStatus, used: socket.data.used, total: socket.data.total });
+      cb({ roomId: room.id, roomCreatedAt: rs.roomCreatedAt, roomExpired: ROOM_EXPIRED, ...clientStatus, used: socket.data.used, total: socket.data.total, data: rs!.data });
     } catch (error) {
       console.error(error);
       socket.emit('error', { message: '发送者加入房间失败' });

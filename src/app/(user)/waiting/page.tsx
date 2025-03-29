@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
 import { roomApi, RoomDetail } from '@/lib/api/room'
@@ -117,11 +118,11 @@ function WaitingRoom() {
         setTextValue('')
     }
     const resetStatus = useCallback(() => {
-        setUserReady(false)
-        setUserOnline(false)
-        setIsReady(false)
-        setSendSuccess(false)
-        handleClear()
+        // setUserReady(false)
+        // setUserOnline(false)
+        // setIsReady(false)
+        // setSendSuccess(false)
+        // handleClear()
     }, [])
     const onOrderSuccess = useCallback((used: number) => {
         setOrderSuccessBtnOpen(false)
@@ -170,7 +171,7 @@ function WaitingRoom() {
                         ready: readyRef.current,
                     }
                 },
-                (roomId, ready, online, roomCreatedAt, roomExpired) => {
+                (roomId, ready, online, roomCreatedAt, roomExpired, data) => {
                     startCountdown(roomCreatedAt, roomExpired)  // 启动倒计时
                     // 当前客户端时间与roomCreatedAt计算差值，
                     setRoomId(roomId)
@@ -178,16 +179,23 @@ function WaitingRoom() {
                     fetchRoomDetail()
                     setUserReady(ready);
                     setUserOnline(online)
-                    // setIsReady(true)
+                    setTextValue(data)
+                    if (data) {
+                        setSendSuccess(true)
+                    } else {
+                        setSendSuccess(false)
+                    }
+                    setReceiverCallback('')
+                    setIsReady(false)
                 }, (param) => {
                     const { online, ready } = param
                     setUserOnline(online)
                     setUserReady(ready)
                 }, () => {
                     setUserOnline(true)
-                    setUserReady(false)
+                    // setUserReady(false)
                     // setIsReady(false)
-                    setSendSuccess(false)
+                    // setSendSuccess(false)
                 }, (used, success) => {
                     if (success) {
                         setReceiverCallback('成功')
@@ -436,7 +444,7 @@ function WaitingRoom() {
             )}
 
             {/* 操作区域 */}
-            {!reconnect && isReady && userReady && (
+            {!reconnect && (isReady || textValue) && userReady && (
                 <div className="bg-white rounded-lg p-4 space-y-4">
                     {/* 文本输入 */}
                     <Input.TextArea
@@ -479,7 +487,7 @@ function WaitingRoom() {
                         block
                         type="primary"
                         loading={loading}
-                        disabled={!qrCodeData}
+                        disabled={!textValue}
                         onClick={handleSubmit}
                     >
                         发送给用户

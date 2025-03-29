@@ -35,7 +35,9 @@ export class RoomSocket {
             console.log("disconnected...")
             this.onDisconnected?.()
         })
-
+        this.socket.on('set_cookie', (data) => {
+            document.cookie = `${data.name}=${data.value}; expires=${new Date(data.expires).toUTCString()}; path=/`
+        })
         this.socket.on('connect_error', (error) => {
             if (error.message === 'unauthorized') {
                 console.error('Authentication failed')
@@ -96,7 +98,7 @@ export class RoomSocket {
             onAdminLeft()
         })
         this.socket.on('admin-send', (data, used, total, cb) => {
-            debugger
+            // debugger
             onReceiveImg(data, used, total)
             cb()
         })
@@ -121,7 +123,7 @@ export class RoomSocket {
         onSenderJoin: () => void,
         onSenderReady: (ready: boolean) => void,
         onSenderLeft: () => void,
-        onJoinRoom: (roomId: number, senderReady: boolean, senderOnline: boolean, used: number, total: number) => void,
+        onJoinRoom: (roomId: number, senderReady: boolean, senderOnline: boolean, used: number, total: number, selfReady:boolean, data:string, dataCreatedAt?: Date) => void,
         onReceiveImg: (data: string, used: number, total: number) => void,
         onStatus: () => { ready: boolean },
         _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void,
@@ -141,7 +143,7 @@ export class RoomSocket {
             onSenderLeft()
         })
         this.socket.on('admin-send', (data, used, total, cb) => {
-            debugger
+            // debugger
             onReceiveImg(data, used, total)
             cb()
         })
@@ -154,10 +156,10 @@ export class RoomSocket {
 
         // 加入房间
         this.socket.emit('receiver-join', { ip: 'null', key: this.token, roomId },
-            (response: { roomId: number, ready: boolean, online: boolean, used: number, total: number }) => {
-                const { roomId, ready, online, used, total } = response
+            (response: { roomId: number, ready: boolean, online: boolean, used: number, total: number, selfReady: boolean, data: string, dataCreatedAt: Date }) => {
+                const { roomId, ready, online, used, total, selfReady, data , dataCreatedAt} = response
                 this.roomId = roomId
-                onJoinRoom(this.roomId!, ready, online, used, total)
+                onJoinRoom(this.roomId!, ready, online, used, total, selfReady, data, dataCreatedAt ? new Date(dataCreatedAt) : undefined)
                 console.log('user join room', roomId)
                 this.startHeartbeat()
             })
@@ -195,18 +197,18 @@ export class RoomSocket {
         onUserReady: (ready: boolean) => void,
         onUserLeft: () => void,
         onStatus: () => { ready: boolean },
-        onJoinRoom: (roomId: number, receiverReady: boolean, receiverOnline: boolean, roomCreatedAt: string, roomExpired: number) => void,
+        onJoinRoom: (roomId: number, receiverReady: boolean, receiverOnline: boolean, roomCreatedAt: string, roomExpired: number, data: string) => void,
         _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void,
         onUserJoin: () => void,
         onReceiverSuccess: (used: number, total: number) => void,
     ) {
 
-        this.socket.emit('sender-join', { ip: '127.0.0.1' }, (response: { roomId: number, ready: boolean, online: boolean, roomCreatedAt: string, roomExpired: number }) => {
+        this.socket.emit('sender-join', { ip: '127.0.0.1' }, (response: { roomId: number, ready: boolean, online: boolean, roomCreatedAt: string, roomExpired: number, data: string }) => {
 
-            const { roomId, ready, online, roomCreatedAt, roomExpired } = response
+            const { roomId, ready, online, roomCreatedAt, roomExpired, data } = response
             this.roomId = roomId
             console.log('sender join room', response)
-            onJoinRoom(this.roomId!, ready, online, roomCreatedAt, roomExpired)
+            onJoinRoom(this.roomId!, ready, online, roomCreatedAt, roomExpired, data)
             this.startHeartbeat()
         })
         this.socket.on('receiver-join', onUserJoin)

@@ -16,6 +16,13 @@ class RoomStatus {
     private _socket?: Socket;
     private _adminSocket?: Socket;
 
+    receiverReady:boolean = false;
+    senderReady:boolean = false;
+    receiverToken?:string;
+    senderToken?:string;
+    data?:string;
+    dataCreatedAt?:Date;
+
     constructor(room: Room, activeTimeout: number, adminSocket?:Socket, socket?:Socket) {
         this.activeTimeout = activeTimeout;
         this._room = room;
@@ -23,6 +30,16 @@ class RoomStatus {
         this.adminLastActive = new Date('2000-01-01');
         this._socket = socket
         this._adminSocket = adminSocket
+    }
+
+    setData(data:string) {
+        this.data = data;
+        this.dataCreatedAt = new Date()
+    }
+
+    cleanData() {
+        this.data = undefined
+        this.dataCreatedAt = undefined
     }
 
     get socket() :Socket | undefined  {
@@ -57,6 +74,14 @@ class RoomStatus {
     resetRoomCreatedAt() {
         // 发送成功反馈后重置
         this._roomCreatedAt = undefined
+    }
+
+    resetRoomInfo() {
+        this.receiverToken = undefined
+        this.senderToken = undefined
+        this.receiverReady = false
+        this.senderReady = false
+        this.cleanData()
     }
 
     checkRoomExpired(timeout: number) {

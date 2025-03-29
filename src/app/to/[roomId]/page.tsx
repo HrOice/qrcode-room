@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
 import ConfirmDialog from '@/components/ConfirmDialog'
@@ -25,7 +24,7 @@ function WaitingContent() {
     const [orderSuccessBtnOpen, setOrderSuccessBtnOpen] = useState(false)
     const [orderFailBtnOpen, setOrderFailBtnOpen] = useState(false)
     const [sendSuccess, setSendSuccess] = useState(false)
-
+    const [dataExpired, setDataExpired] = useState(false)
     const roomSocketRef = useRef<RoomSocket | null>(null)
 
 
@@ -36,9 +35,9 @@ function WaitingContent() {
     const resetStatus = () => {
         setAdminJoin(false)
         setAdminReady(false)
-        setReady(false)
-        setSendSuccess(false)
-        setReveivedUrl('')
+        // setReady(false)
+        // setSendSuccess(false)
+        // setReveivedUrl('')
     }
 
 
@@ -69,16 +68,27 @@ function WaitingContent() {
                 setAdminReady(ready)
             }, () => {
                 resetStatus()
-            }, (id, ready, online, used) => {
+                setAdminReady(false)
+                setAdminJoin(false)
+            }, (id, ready, online, used, total, selfReady, data, dataCreatedAt) => {
                 setRoomId(id)
                 setAdminJoin(online)
                 setAdminReady(ready)
-                setReady(false)
+                setReady(selfReady)
+                setReveivedUrl(data)
+                if (data) {
+                    setSendSuccess(true)
+                    if (dataCreatedAt!.getTime() + 30000 < new Date().getTime()) {
+                        // 不显示打开链接
+                        setDataExpired(true)
+                    }
+                }
                 // setTotalCount(total)
                 // setUsedCount(used)
             }, (data) => {
                 setReveivedUrl(data)
                 setSendSuccess(true)
+                setDataExpired(false)
                 setTimeout(() => {
                     if (window) {
                         window.open(data, '_blank')
@@ -170,7 +180,7 @@ function WaitingContent() {
             {/* 根据不同状态显示不同内容 */}
             {!reconnect && (
                 <>
-                    {!adminJoin ? (
+                    {(!reveivedUrl && !adminJoin ) ? (
                         // 等待管理员加入状态
                         <div className="text-center space-y-4">
                             <div className="text-lg">等待发送者接入...</div>
@@ -184,14 +194,14 @@ function WaitingContent() {
                             {/* 二维码展示区域 */}
                             <div className="bg-white rounded-lg p-4">
                                 <div className="aspect-square w-full max-w-sm mx-auto rounded-lg flex items-center justify-center">
-                                    {!adminReady ? (
+                                    {(!adminReady) && (!reveivedUrl) ? (
                                         <div className="text-gray-400">
                                             等待发送者准备...
                                         </div>
-                                    ) : reveivedUrl ? (
+                                    ) : (reveivedUrl) ? (
                                         <div className='w-full flex flex-col items-center'>
                                             <div className='p-4'>接收成功</div>
-                                            <Button
+                                            {!dataExpired && <Button
                                                 type="primary" block
                                                 onClick={() => {
                                                     if (reveivedUrl.startsWith('http://') || reveivedUrl.startsWith("https://")) {
@@ -202,7 +212,7 @@ function WaitingContent() {
                                                 }}
                                             >
                                                 打开链接
-                                            </Button>
+                                            </Button>}
                                             <div className="pt-6 w-full"  ></div>
                                             {sendSuccess && (<div className='flex  w-full space-x-1'><Button
                                                 block

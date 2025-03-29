@@ -33,12 +33,12 @@ class CDKeysController {
         const { number, totalUse } = await request.json();
         // 新增cdkey
         try {
-            await createCDKeys(number, totalUse);
+            const keys = await createCDKeys(number, totalUse);
+            return NextResponse.json({ result: true , keys});
         } catch (e) {
             console.error(e);
             return NextResponse.json({ error: '新增失败' }, { status: 500 });
         }
-        return NextResponse.json({ result: true });
     }
 }
 

@@ -6,7 +6,7 @@ import { Search } from '@react-vant/icons'
 import { format } from 'date-fns'
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Button, Cell, Input, Pagination, Popup } from 'react-vant'
+import { Button, Cell, Dialog, Input, Pagination, Popup } from 'react-vant'
 
 export default function CDKeyPage() {
     const [cdkeys, setCDKeys] = useState<CDKey[]>([])
@@ -22,6 +22,9 @@ export default function CDKeyPage() {
         number: 1,      // 生成个数
         totalUse: 1,      // 可用次数
     })
+    const [lastCreatedKeys, setLastCreatedKeys] = useState<CDKey[]>([])
+    const [showCreatedDialog, setShowCreatedDialog] = useState(false)
+
     // 获取列表
     const fetchCDKeys = useCallback(async () => {
         setLoading(true)
@@ -126,19 +129,18 @@ export default function CDKeyPage() {
                                         复制
                                     </Button>
                                 </div>
-                                
+
                                 {/* 在小屏幕下显示的信息 */}
                                 <div className="lg:hidden w-full grid grid-cols-2 gap-2 text-sm text-gray-600">
                                     <div>使用次数: {cdkey.used}/{cdkey.total}</div>
                                     <div>
-                                       状态:
-                                       <span className={`ml-1 px-2 py-1 rounded ${
-                                           cdkey.status
-                                               ? 'bg-green-50 text-green-600'
-                                               : 'bg-red-50 text-red-600'
-                                       }`}>
-                                           {cdkey.status ? '可用' : '失效'}
-                                       </span>
+                                        状态:
+                                        <span className={`ml-1 px-2 py-1 rounded ${cdkey.status
+                                                ? 'bg-green-50 text-green-600'
+                                                : 'bg-red-50 text-red-600'
+                                            }`}>
+                                            {cdkey.status ? '可用' : '失效'}
+                                        </span>
                                     </div>
                                     <div>创建时间: {format(new Date(cdkey.createdAt), 'yyyy-MM-dd HH:mm')}</div>
                                 </div>
@@ -148,18 +150,17 @@ export default function CDKeyPage() {
                                     {cdkey.used}/{cdkey.total}
                                 </div>
                                 <div className="hidden lg:block">
-                                    <span className={`px-2 py-1 rounded text-sm ${
-                                        cdkey.status 
-                                            ? 'bg-green-50 text-green-600' 
+                                    <span className={`px-2 py-1 rounded text-sm ${cdkey.status
+                                            ? 'bg-green-50 text-green-600'
                                             : 'bg-red-50 text-red-600'
-                                    }`}>
+                                        }`}>
                                         {cdkey.status ? '可用' : '失效'}
                                     </span>
                                 </div>
                                 <div className="hidden lg:block text-gray-600 text-sm">
                                     {format(new Date(cdkey.createdAt), 'yyyy-MM-dd HH:mm')}
                                 </div>
-                                
+
                                 {/* 操作按钮 */}
                                 {/*<div className="w-full lg:w-auto flex lg:flex-col gap-2">*/}
                                 {/*    <Button*/}
@@ -192,14 +193,14 @@ export default function CDKeyPage() {
             </div>
 
             {/* 分页 */}
-            <Pagination 
-                value={currentPage} 
+            <Pagination
+                value={currentPage}
                 onChange={(p) => {
                     setCurrentPage(p)
-                }} 
-                mode="simple" 
-                totalItems={totalItems} 
-                itemsPerPage={10} 
+                }}
+                mode="simple"
+                totalItems={totalItems}
+                itemsPerPage={10}
             />
 
             {/* 状态选择器 */}
@@ -270,7 +271,7 @@ export default function CDKeyPage() {
                                     }));
                                 }
                             }}
-                            // min={1}
+                        // min={1}
                         />
                     </div>
 
@@ -295,7 +296,7 @@ export default function CDKeyPage() {
                                     }));
                                 }
                             }}
-                            // min={1}
+                        // min={1}
                         />
                     </div>
 
@@ -311,9 +312,11 @@ export default function CDKeyPage() {
                             type="primary"
                             onClick={async () => {
                                 try {
-                                    await cdkeyApi.addCDKey(addForm)
+                                    const keys = await cdkeyApi.addCDKey(addForm)
+                                    setLastCreatedKeys(keys) // 保存创建的 keys
                                     toast.success('创建成功')
                                     setShowAddDialog(false)
+                                    setShowCreatedDialog(true) // 显示创建成功对话框
                                     fetchCDKeys()
                                 } catch (error) {
                                     console.error(error)
@@ -326,6 +329,31 @@ export default function CDKeyPage() {
                     </div>
                 </div>
             </Popup>
+
+            <Dialog
+                visible={showCreatedDialog}
+                title="创建成功"
+                showCancelButton
+                onConfirm={async () => {
+                    const keysText = lastCreatedKeys.map(key => key.key).join('\n')
+                    await copyToClipboard(keysText)
+                    setShowCreatedDialog(false)
+                }}
+                onCancel={() => setShowCreatedDialog(false)}
+                confirmButtonText="复制全部"
+                cancelButtonText="关闭"
+            >
+                <div className="space-y-2">
+                    <div>已生成 {lastCreatedKeys.length} 个 CDKey</div>
+                    <div className="max-h-40 overflow-auto text-xs font-mono bg-gray-50 p-2 rounded">
+                        {lastCreatedKeys.map(key => (
+                            <div key={key.id} className="py-1">
+                                {key.key}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </Dialog>
         </div>
     )
 }

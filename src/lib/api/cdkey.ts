@@ -38,10 +38,11 @@ export const cdkeyApi = {
         })
     },
 
-    addCDKey(data: { number: number, totalUse: number }) {
-        return request('/admin/cdkeys', {
+    async addCDKey(data: { number: number, totalUse: number }): Promise<CDKey[]> {
+        const r = await request<{keys:CDKey[]}>('/admin/cdkeys', {
             method: 'POST',
             body: data
         })
-    }
+        return r.keys;
+    }   
 }

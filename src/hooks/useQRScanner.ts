@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react'
 import jsQR from 'jsqr'
+import { useCallback, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 
 interface UseQRScannerOptions {
@@ -11,7 +11,19 @@ export function useQRScanner({ onSuccess }: UseQRScannerOptions = {}) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const stopCamera = useCallback(() => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current)
+      scanIntervalRef.current = null
+    }
 
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+
+    setShowCamera(false)
+  }, [])
   const scanQRCode = useCallback(() => {
     if (!videoRef.current || !videoRef.current.videoWidth) return
 
@@ -43,26 +55,14 @@ export function useQRScanner({ onSuccess }: UseQRScannerOptions = {}) {
     } catch (error) {
       console.error('扫描二维码出错:', error)
     }
-  }, [onSuccess])
+  }, [onSuccess, stopCamera])
 
   const startScanning = useCallback(() => {
     const interval = setInterval(scanQRCode, 200)
     scanIntervalRef.current = interval
   }, [scanQRCode])
 
-  const stopCamera = useCallback(() => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current)
-      scanIntervalRef.current = null
-    }
 
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop())
-      streamRef.current = null
-    }
-
-    setShowCamera(false)
-  }, [])
 
   const startCamera = useCallback(async () => {
     try {
