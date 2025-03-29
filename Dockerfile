@@ -1,7 +1,7 @@
 FROM docker.m.daocloud.io/node:20-alpine AS deps
 WORKDIR /app
 RUN npm config set registry http://registry.npm.taobao.org/ && \
-    npm i socket.io prisma @prisma/client
+    npm i socket.io prisma @prisma/client uuid
 
 FROM docker.m.daocloud.io/node:20-alpine
 WORKDIR /app
@@ -12,7 +12,6 @@ COPY --from=deps /app/node_modules/ ./node_modules/
 
 # 安装生产依赖
 RUN npm config set registry http://registry.npm.taobao.org/ && \
-    npm i uuid && \
     npx prisma generate
 
 # 设置环境变量
