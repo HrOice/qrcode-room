@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "ts-node -r tsconfig-paths/register --project tsconfig.server.json server.ts",
     "build": "next build",
-    "tsbuild": "next build && tsc server.ts",
-    "start": "NODE_ENV=production ts-node -r tsconfig-paths/register --project tsconfig.server.json server.ts",
+    "build:server": "tsc --project tsconfig.server.json && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/",
+    "start": "NODE_ENV=production node server.js",
     "lint": "next lint",
     "db:seed": "npx prisma db seed"
   },
@@ -20,6 +20,7 @@
     "jimp": "^1.6.0",
     "jose": "^6.0.10",
     "jsqr": "^1.4.0",
+    "module-alias": "^2.2.3",
     "next": "15.2.3",
     "prisma": "^6.5.0",
     "qrcode": "^1.5.4",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/module-alias": "^2.0.4",
     "@types/node": "^20.17.25",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.0.12",

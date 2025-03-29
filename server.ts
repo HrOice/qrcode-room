@@ -1,8 +1,13 @@
-import { createServer } from 'http'
-import next from 'next'
-import { parse } from 'url'
-import { createSocketServer } from './src/lib/socket/server'
+import { createServer } from 'http';
+// import { addAlias } from 'module-alias';
+import next from 'next';
+// import { join } from 'path';
 import "tsconfig-paths/register";
+import { parse } from 'url';
+import { createSocketServer } from './src/lib/socket/server';
+
+// 添加路径别名
+// addAlias('@', join(__dirname));
 
 const dev = process.env.NODE_ENV !== 'production'
 const app = next({ dev, turbopack: true, dir: '.' })

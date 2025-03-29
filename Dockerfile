@@ -11,15 +11,19 @@ RUN npm config set registry http://registry.npm.taobao.org/ && \
 FROM docker.m.daocloud.io/node:20-alpine
 WORKDIR /app
 
-# 从依赖阶段复制 node_modules
-COPY --from=deps /app/node_modules ./node_modules
+# 复制 package.json 和 生产依赖
+COPY package*.json ./
+COPY prisma ./prisma/
 
-# 复制源代码
-COPY . .
+# 安装生产依赖
+RUN npm config set registry http://registry.npm.taobao.org/ && \
+    npm ci --only=production && \
+    npx prisma generate
 
-# 生成 Prisma 客户端并构建应用
-RUN npx prisma generate && \ 
-    npm run build
+# 复制构建产物
+COPY .next/standalone ./
+COPY .next/static ./.next/static
+COPY public ./public
 
 # 设置环境变量
 ENV NODE_ENV=production
@@ -29,5 +33,5 @@ ENV HOSTNAME="0.0.0.0"
 # 暴露端口
 EXPOSE 3000
 
-# 使用 ts-node 启动服务
-CMD ["npm", "start"]
+# 启动服务
+CMD ["node", "server.js"]

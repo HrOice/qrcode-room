@@ -1,5 +1,5 @@
-import prisma from '@/lib/db';
 import { randomBytes } from 'crypto';
+import prisma from '../db';
 
 
 const CHAR_SET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';

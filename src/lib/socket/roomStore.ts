@@ -1,9 +1,9 @@
 // 用于操作Room的
 
-import { checkRoomOrCreate, deleteRooms, findAndDeleteRoom, senderCheckRoomOrCreate, updateAdminInfo, updateReceiverInfo } from '@/lib/service/RoomService';
 import { Room } from "@prisma/client";
 import { Socket } from 'socket.io';
 import { invalidCDKey } from '../service/CDkeyService';
+import { checkRoomOrCreate, deleteRooms, findAndDeleteRoom, senderCheckRoomOrCreate, updateAdminInfo, updateReceiverInfo } from '../service/RoomService';
 
 class RoomStatus {
     private clientLastActive: Date;
