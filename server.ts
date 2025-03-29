@@ -2,7 +2,7 @@ import { createServer } from 'http';
 // import { addAlias } from 'module-alias';
 import next from 'next';
 // import { join } from 'path';
-import "tsconfig-paths/register";
+// import "tsconfig-paths/register";
 import { parse } from 'url';
 import { createSocketServer } from './src/lib/socket/server';
 

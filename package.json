@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "ts-node -r tsconfig-paths/register --project tsconfig.server.json server.ts",
     "build": "next build",
-    "build:server": "tsc --project tsconfig.server.json && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/",
+    "build:server": "tsc --project tsconfig.server.json && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/ && cp -r prisma .next/standalone",
     "start": "NODE_ENV=production node server.js",
     "lint": "next lint",
     "db:seed": "npx prisma db seed"

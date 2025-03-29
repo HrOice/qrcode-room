@@ -180,15 +180,7 @@ function WaitingContent() {
             {/* 根据不同状态显示不同内容 */}
             {!reconnect && (
                 <>
-                    {(!reveivedUrl && !adminJoin ) ? (
-                        // 等待管理员加入状态
-                        <div className="text-center space-y-4">
-                            <div className="text-lg">等待发送者接入...</div>
-                            <div className="animate-pulse text-gray-500">
-                                请保持页面打开
-                            </div>
-                        </div>
-                    ) : (
+                    {(
                         // 管理员已加入状态
                         <div className="space-y-4">
                             {/* 二维码展示区域 */}
