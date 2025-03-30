@@ -8,7 +8,7 @@ import { toast } from 'react-hot-toast';
 
 // import { useRouter } from 'next/navigation';
 import { copyToClipboard } from '@/lib/utils/clipboard';
-import { generateQRWithText } from '@/lib/utils/qrcode';
+import { encodeRoomUrl, generateQRWithText } from '@/lib/utils/qrcode';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Input } from 'react-vant';
@@ -67,8 +67,7 @@ export default function RoomListPage() {
     // 生成和显示二维码
     const handleShowQR = async (roomId: number) => {
         try {
-            const url = `${window.location.origin}/to/${roomId}`
-            const qrDataUrl = await generateQRWithText(url, {
+            const qrDataUrl = await generateQRWithText(encodeRoomUrl(roomId), {
                 centerText: String(roomId)
             })
             setCurrentRoomQR({ id: roomId, qr: qrDataUrl })
@@ -81,7 +80,7 @@ export default function RoomListPage() {
 
     // 复制链接
     const copyRoomLink = async (roomId: number) => {
-        const url = `${window.location.origin}/to/${roomId}`
+        const url = encodeRoomUrl(roomId);
         copyToClipboard(url)
     }
 

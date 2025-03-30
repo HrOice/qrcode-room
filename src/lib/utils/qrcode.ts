@@ -80,3 +80,14 @@ export async function generateQRWithText(text: string, options: QROptions = {}) 
     throw error
   }
 }
+
+export const encodeRoomUrl = (roomId: number ) => {
+  return `${window.location.origin}/to/${btoa('ABCDE;' + btoa(String(roomId))).replaceAll('=','')}`
+}
+
+export const decodeRoomUrl = (roomIdStr: string ) => {
+  roomIdStr = decodeURIComponent(roomIdStr)
+  const a = atob(roomIdStr)
+  const b = a.split(';')[1]
+  return atob(b);
+}

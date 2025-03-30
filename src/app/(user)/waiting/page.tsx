@@ -13,7 +13,7 @@ import ConfirmDialog from '@/components/ConfirmDialog'
 import { useNotifySound } from '@/hooks/useNotifySound'
 import { useQRScanner } from '@/hooks/useQRScanner'
 import { copyToClipboard } from '@/lib/utils/clipboard'
-import { generateQRWithText } from '@/lib/utils/qrcode'
+import { encodeRoomUrl, generateQRWithText } from '@/lib/utils/qrcode'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { Qr } from '@react-vant/icons'
 import Image from 'next/image'
@@ -119,7 +119,7 @@ function WaitingRoom() {
     }
     const resetStatus = useCallback(() => {
         // setUserReady(false)
-        // setUserOnline(false)
+        setUserOnline(false)
         // setIsReady(false)
         // setSendSuccess(false)
         // handleClear()
@@ -171,7 +171,7 @@ function WaitingRoom() {
                         ready: readyRef.current,
                     }
                 },
-                (roomId, ready, online, roomCreatedAt, roomExpired, data) => {
+                (roomId, ready, online, roomCreatedAt, roomExpired, data, dataCreatedAt) => {
                     startCountdown(roomCreatedAt, roomExpired)  // 启动倒计时
                     // 当前客户端时间与roomCreatedAt计算差值，
                     setRoomId(roomId)
@@ -187,6 +187,18 @@ function WaitingRoom() {
                     }
                     setReceiverCallback('')
                     setIsReady(false)
+                    if (dataCreatedAt!.getTime() + 30000 < new Date().getTime()) {
+                        // 不显示打开链接
+                        setSendSuccess(false)
+                        setTextValue('')
+                    } else {
+                        setTimeout(() => {
+                            setSendSuccess(false)
+                            setTextValue('')
+                            setIsReady(true)
+                            setUserReady(true)
+                        }, (dataCreatedAt!.getTime() + 30000) - new Date().getTime())
+                    }
                 }, (param) => {
                     const { online, ready } = param
                     setUserOnline(online)
@@ -232,11 +244,32 @@ function WaitingRoom() {
             setIsReady(re)
         })
     }
+    /**
+     * 从输入文本中提取支付宝链接
+     * @param input 输入的文本内容
+     * @returns 提取的链接，如果没有找到则返回 null
+     */
+    function extractAlipayLink(input: string): string | null {
+        // 匹配以 https://ds.alipay.com/ 开头的链接
+        const regex = /https:\/\/ds\.alipay\.com\/[^\s]+/
+        const match = input.match(regex)
 
+        if (match && match[0]) {
+            // 如果链接末尾有中文或其他文字，去除
+            return match[0].replace(/[\u4e00-\u9fa5]+$/, '').trim()
+        }
+
+        return null
+    }
     // 修改文本变化处理函数
     const handleTextChange = async (text: string) => {
         try {
-            setTextValue(text)
+            const link = extractAlipayLink(text)
+            if (link) {
+                setTextValue(link)
+            } else {
+                setTextValue(text)
+            }
             if (text) {
                 // 不带文字
                 // const qrDataUrl = await generateQR(text)  // 添加中心文本
@@ -309,6 +342,11 @@ function WaitingRoom() {
     // 处理提交
     const handleSubmit = async () => {
         if (!roomSocketRef.current || !textValue) return
+        const link = extractAlipayLink(textValue)
+        if (!link) {
+            toast.error('不支持的链接，请检查')
+            return
+        }
         setLoading(true)
         try {
             roomSocketRef.current!.adminSend(textValue, (used, total) => {
@@ -316,6 +354,10 @@ function WaitingRoom() {
                     toast.success('发送成功')
                     setSendSuccess(true)
                     setUsedCount(used)
+                    setTimeout(() => {
+                        setTextValue('')
+                        setSendSuccess(false)
+                    }, 30000)
                 } else {
                     toast.success('次数不足')
                 }
@@ -359,7 +401,7 @@ function WaitingRoom() {
     // 修改房间二维码生成
     const generateRoomQR = useCallback(async () => {
         if (!room) return
-        const url = `${window.location.origin}/to/${room.id}`
+        const url = encodeRoomUrl(room.id)
         try {
             const qrDataUrl = await generateQRWithText(url, {
                 centerText: String(room.id)
@@ -392,6 +434,11 @@ function WaitingRoom() {
 
     return (
         <div className="max-w-2xl p-4 space-y-6">
+            <div className="bg-white rounded-lg p-4 space-y-3">
+                <div>二维码或者链接自生成后有效期限为30秒   失效请重新生成再次上传，切勿上传相同二维码或者链接</div>
+                <div>一旦发送成功就可以在后台查看验证情况  通过后进行下单即可。</div>
+                <div className='text-red-600'>中途切记不要离开网页 避免掉线</div>
+            </div>
             {/* 房间信息 */}
             <div className="bg-white rounded-lg p-4 space-y-3">
                 <div className="flex justify-between items-center">
@@ -444,7 +491,7 @@ function WaitingRoom() {
             )}
 
             {/* 操作区域 */}
-            {!reconnect && (isReady || textValue) && userReady && (
+            {!reconnect && (isReady || textValue) && (
                 <div className="bg-white rounded-lg p-4 space-y-4">
                     {/* 文本输入 */}
                     <Input.TextArea
@@ -487,7 +534,7 @@ function WaitingRoom() {
                         block
                         type="primary"
                         loading={loading}
-                        disabled={!textValue}
+                        disabled={!textValue || !userOnline}
                         onClick={handleSubmit}
                     >
                         发送给用户
@@ -520,15 +567,15 @@ function WaitingRoom() {
                     <div className="flex justify-between items-center">
                         <div className="space-y-2">
                             <div>
-                                用户状态:
+                                对方是否在线:
                                 <span className={`ml-2 ${userOnline ? 'text-green-600' : 'text-red-600'}`}>
                                     {userOnline ? '在线' : '离线'}
                                 </span>
-                                {userOnline && (
+                                {/* {userOnline && (
                                     <span className={`ml-2 ${userReady ? 'text-green-600' : 'text-yellow-600'}`}>
                                         {userReady ? '已准备' : '未准备'}
                                     </span>
-                                )}
+                                )} */}
                             </div>
                         </div>
                         <Button
@@ -536,7 +583,7 @@ function WaitingRoom() {
                             disabled={isReady} // 用户不在线时禁用准备按钮
                             onClick={handleReady}
                         >
-                            {isReady ? '已准备' : '准备'}
+                            {isReady ? '点击开始' : '点击开始'}
                         </Button>
                     </div>
                 </div>)}
@@ -616,7 +663,7 @@ function WaitingRoom() {
                                     </div> */}
                                     <Button
                                         size="small"
-                                        onClick={() => copyToClipboard(`${window.location.origin}/to/${room.id}`)}
+                                        onClick={() => copyToClipboard(encodeRoomUrl(room.id))}
                                     >
                                         复制地址
                                     </Button>

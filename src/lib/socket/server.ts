@@ -256,18 +256,16 @@ export function createSocketServer(server: any) {
     handleHeartBeat(socket);
 
 
-
-
     // 断开连接
     socket.on('disconnect', () => {
       const roomId = socket.data.roomId;
       const rs = roomCache.getRoom(roomId);
       console.log('Client disconnected:', roomId, socket.id, socket.data.role)
       if (socket.data.role === 'admin') {
-        // socket.to(String(roomId)).emit('admin-left')
+        socket.to(String(roomId)).emit('admin-left')
         rs?.cancelAdminSocketId(socket.id)
       } else {
-        // socket.to(String(roomId)).emit('user-left')
+        socket.to(String(roomId)).emit('user-left')
         rs?.cancelSocketId(socket.id);
       }
     })
@@ -500,7 +498,7 @@ function handleSenderJoin(socket: Socket, TIMEOUT_MS: number) {
       socket.to(String(room.id)).emit('sender-join', { roomId: room.id });
       // 要检查的状态，是否在线，是否准备
       const clientStatus = await checkClientStatus(socket);
-      cb({ roomId: room.id, roomCreatedAt: rs.roomCreatedAt, roomExpired: ROOM_EXPIRED, ...clientStatus, used: socket.data.used, total: socket.data.total, data: rs!.data });
+      cb({ roomId: room.id, roomCreatedAt: rs.roomCreatedAt, roomExpired: ROOM_EXPIRED, ...clientStatus, used: socket.data.used, total: socket.data.total, data: rs!.data, dataCreatedAt: rs!.dataCreatedAt });
     } catch (error) {
       console.error(error);
       socket.emit('error', { message: '发送者加入房间失败' });

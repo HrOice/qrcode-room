@@ -133,6 +133,7 @@ class RoomStatus {
         if (this.adminSocketId === socketId) {
             this.setAdminSocketId(undefined)
             this._adminSocket = undefined
+            this.senderToken = undefined
         }
     }
 
@@ -144,6 +145,7 @@ class RoomStatus {
         if (this.socketId === socketId) {
             this.setSocketId(undefined)
             this._socket = undefined
+            this.receiverToken = undefined
         }
     }
 

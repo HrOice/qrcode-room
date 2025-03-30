@@ -1,9 +1,9 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 
 'use client'
 
 import ConfirmDialog from '@/components/ConfirmDialog'
 import { RoomSocket } from '@/lib/socket/client'
+import { decodeRoomUrl } from '@/lib/utils/qrcode'
 import { useParams, useRouter } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import toast, { Toaster } from 'react-hot-toast'
@@ -28,8 +28,9 @@ function WaitingContent() {
     const [sendSuccess, setSendSuccess] = useState(false)
     const [dataExpired, setDataExpired] = useState(false)
     const roomSocketRef = useRef<RoomSocket | null>(null)
-
-
+    const [noticeSender, setNoticeSender] = useState(false)
+    const [noticeSenderTime, setNoticeSenderTime] = useState(0)
+    const noticeSenderTimeRef = useRef<NodeJS.Timeout>(null);
     useEffect(() => {
         readyRef.current = ready  // 当 ready 状态改变时更新 ref
     }, [ready])
@@ -37,6 +38,7 @@ function WaitingContent() {
     const resetStatus = () => {
         setAdminJoin(false)
         setAdminReady(false)
+        setNoticeSender(false)
         // setReady(false)
         // setSendSuccess(false)
         // setReveivedUrl('')
@@ -54,7 +56,9 @@ function WaitingContent() {
 
 
     useEffect(() => {
-        const { roomId } = params; // cdKey
+        let { roomId } = params; // cdKey
+
+        roomId = decodeRoomUrl(String(roomId))
         if (!roomId) {
             throw new Error('房间不存在')
         }
@@ -83,6 +87,10 @@ function WaitingContent() {
                     if (dataCreatedAt!.getTime() + 30000 < new Date().getTime()) {
                         // 不显示打开链接
                         setDataExpired(true)
+                        setSendSuccess(false)
+                        setReveivedUrl('')
+                    } else {
+                        window.open(data, '_blank')
                     }
                 }
                 // setTotalCount(total)
@@ -130,7 +138,17 @@ function WaitingContent() {
             console.log('user ready', ready, re)
             setReady(re)
             console.log('user ready1', ready, re)
-
+            setNoticeSender(true)
+            setNoticeSenderTime(30)
+            noticeSenderTimeRef.current = setInterval(() => {
+                setNoticeSenderTime((r) => {
+                    return r -1;
+                })
+            }, 1000) 
+            setTimeout(() => {
+                setNoticeSender(false)
+                clearInterval(noticeSenderTimeRef.current as NodeJS.Timeout)
+            }, 30000)
         })
     }
 
@@ -190,7 +208,8 @@ function WaitingContent() {
                                 <div className="aspect-square w-full max-w-sm mx-auto rounded-lg flex items-center justify-center">
                                     {(!adminReady) && (!reveivedUrl) ? (
                                         <div className="text-gray-400">
-                                            等待发送者准备...
+                                            <span>请在此页面等待0-2分钟  中途不要离开网页  避免掉线</span>
+                                            <div className='text-center'>等待发送者发送...</div>
                                         </div>
                                     ) : (reveivedUrl) ? (
                                         <div className='w-full flex flex-col items-center'>
@@ -252,7 +271,8 @@ function WaitingContent() {
                                         </div>
                                     ) : (
                                         <div className="text-gray-400">
-                                            等待发送者发送...
+                                            <span>请在此页面等待0-2分钟  中途不要离开网页  避免掉线</span>
+                                            <div className='text-center'>等待发送者发送...</div>
                                         </div>
                                     )}
                                 </div>
@@ -263,24 +283,24 @@ function WaitingContent() {
                                 <div className="flex justify-between items-center">
                                     <div className="space-y-2">
                                         <div>
-                                            发送者状态：
-                                            <span className={adminReady ? 'text-green-600' : 'text-yellow-600'}>
-                                                {adminReady ? '已准备' : '未准备'}
+                                        对方是否在线：
+                                            <span className={adminJoin ? 'text-green-600' : 'text-red-600'}>
+                                                {adminJoin ? '在线' : '离线'}
                                             </span>
                                         </div>
-                                        <div>
+                                        {/* <div>
                                             用户状态：
-                                            <span className={ready ? 'text-green-600' : 'text-yellow-600'}>
-                                                {ready ? '已准备' : '未准备'}
+                                            <span className={'text-green-600'}>
+                                                已准备
                                             </span>
-                                        </div>
+                                        </div> */}
                                     </div>
                                     <Button
-                                        type={ready ? 'info' : 'primary'}
-                                        disabled={ready || !adminReady}
+                                        type={'primary'}
+                                        disabled={noticeSender || !adminJoin}
                                         onClick={handleReady}
                                     >
-                                        {ready ? '已准备' : '准备'}
+                                       提醒对方{noticeSender?`(${noticeSenderTime})`:''}
                                     </Button>
                                 </div>
                             </div>

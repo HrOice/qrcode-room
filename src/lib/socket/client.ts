@@ -197,18 +197,18 @@ export class RoomSocket {
         onUserReady: (ready: boolean) => void,
         onUserLeft: () => void,
         onStatus: () => { ready: boolean },
-        onJoinRoom: (roomId: number, receiverReady: boolean, receiverOnline: boolean, roomCreatedAt: string, roomExpired: number, data: string) => void,
+        onJoinRoom: (roomId: number, receiverReady: boolean, receiverOnline: boolean, roomCreatedAt: string, roomExpired: number, data: string, dataCreatedAt?: Date) => void,
         _onHeartBeat: (param: { roomId: number, ready: boolean, online: boolean }) => void,
         onUserJoin: () => void,
         onReceiverSuccess: (used: number, total: number) => void,
     ) {
 
-        this.socket.emit('sender-join', { ip: '127.0.0.1' }, (response: { roomId: number, ready: boolean, online: boolean, roomCreatedAt: string, roomExpired: number, data: string }) => {
+        this.socket.emit('sender-join', { ip: '127.0.0.1' }, (response: { roomId: number, ready: boolean, online: boolean, roomCreatedAt: string, roomExpired: number, data: string, dataCreatedAt: Date }) => {
 
-            const { roomId, ready, online, roomCreatedAt, roomExpired, data } = response
+            const { roomId, ready, online, roomCreatedAt, roomExpired, data, dataCreatedAt } = response
             this.roomId = roomId
             console.log('sender join room', response)
-            onJoinRoom(this.roomId!, ready, online, roomCreatedAt, roomExpired, data)
+            onJoinRoom(this.roomId!, ready, online, roomCreatedAt, roomExpired, data, new Date(dataCreatedAt))
             this.startHeartbeat()
         })
         this.socket.on('receiver-join', onUserJoin)
@@ -290,11 +290,10 @@ export class RoomSocket {
     }
 
     clientLeaveRoom() {
-        // if (this.roomId) {
-        //
-        //     this.socket.emit('user-left', { roomId: this.roomId })
-        //     this.roomId = null
-        // }
+        if (this.roomId) {
+            this.socket.emit('user-left', { roomId: this.roomId })
+            this.roomId = null
+        }
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval as NodeJS.Timeout)
             this.heartbeatInterval = null
