@@ -1,7 +1,7 @@
 FROM docker.m.daocloud.io/node:20-alpine AS deps
 WORKDIR /app
 RUN npm config set registry http://registry.npm.taobao.org/ && \
-    npm i socket.io prisma @prisma/client uuid
+    npm i socket.io prisma @prisma/client uuid date-fns
 
 FROM docker.m.daocloud.io/node:20-alpine
 WORKDIR /app
