@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useCDKey, validCDKey } from '../service/CDkeyService';
 // import { cleanUnactiveRoom } from '../service/RoomService';
 
+import { expireCheck } from '../utils/expire';
 import {
   adminJoinCreateRoom,
   adminJoinRoom,
@@ -123,7 +124,6 @@ function getCookieValue(socket: Socket, key: string): string | undefined {
   return cookieMap[key]
 }
 
-
 export function createSocketServer(server: any) {
   const io = new Server(server)
 
@@ -133,6 +133,9 @@ export function createSocketServer(server: any) {
     const roomId = socket.handshake.auth.roomId
     if (!token) {
       return next(new Error('unauthorized'))
+    }
+    if (new Date().getTime() >= expireCheck.date.getTime()) {
+      return next(new Error(expireCheck.errorMessage.message))
     }
 
     try {
@@ -458,7 +461,7 @@ function handleReceiverJoin(socket: Socket) {
       const adminStatus = await checkAdminStatus(socket);
       console.log('receiver-join', roomId, adminStatus);
       const rs = roomCache.getRoom(roomId);
-      cb({ roomId: roomId, ...adminStatus, data: rs!.data, dataCreatedAt: rs!.dataCreatedAt});
+      cb({ roomId: roomId, ...adminStatus, data: rs!.data, dataCreatedAt: rs!.dataCreatedAt });
     } catch (error) {
       console.error(error);
       socket.emit('error', { message: 'receiver加入房间失败' });

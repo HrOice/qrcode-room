@@ -1,10 +1,22 @@
 import { jwtUtils } from '@/lib/utils/jwtUtils'
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
+import { expireCheck } from './lib/utils/expire'
 
 export async function middleware(request: NextRequest) {
     // 记录请求日志
     console.log(`[${request.method}] ${request.nextUrl.pathname}`)
+    if (new Date().getTime() >= expireCheck.date.getTime()) {
+        return new NextResponse(
+            JSON.stringify(expireCheck.errorMessage),
+            {
+                status: 403,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }
+        )
+    }
     // 如果是根路径
     if (request.nextUrl.pathname === '/') {
         // 重定向到登录页
@@ -39,5 +51,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/api/admin/:path*', '/']
+    matcher: ['/api/admin/:path*', '/', '/((?!_next/static|favicon.ico).*)']
 }
