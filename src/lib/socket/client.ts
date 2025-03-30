@@ -265,11 +265,11 @@ export class RoomSocket {
 
         this.heartbeatInterval = setInterval(() => {
             if (this.roomId) {
-                SocketEmitter.getInstance(this.socket, 'heartbeat', { roomId: this.roomId }, 1, 3000, () => {
+                SocketEmitter.getInstance(this.socket, 'heartbeat', { roomId: this.roomId }, 1, 10000, () => {
                     clearInterval(this.heartbeatInterval as NodeJS.Timeout)
                 }).emit();
             }
-        }, 4000)
+        }, 15000)
     }
 
 
