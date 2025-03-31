@@ -95,10 +95,24 @@ function WaitingRoom() {
         countdownIntervalRef.current = setInterval(updateCountdown, 1000)
     }, [])
 
-
+    // 修改房间二维码生成
+    const generateRoomQR = useCallback(async () => {
+        if (!room) return
+        const url = encodeRoomUrl(room.id)
+        try {
+            const qrDataUrl = await generateQRWithText(url, {
+                centerText: String(room.id)
+            })
+            setRoomQRCode(qrDataUrl)
+        } catch (error) {
+            console.error(error)
+            toast.error('生成房间二维码失败')
+        }
+    }, [room])
     useEffect(() => {
         readyRef.current = isReady  // 当 ready 状态改变时更新 ref
-    }, [isReady])
+        generateRoomQR()
+    }, [isReady, generateRoomQR])
     // 获取房间详情
     const fetchRoomDetail = useCallback(async () => {
         if (roomId == 0) {
@@ -285,7 +299,15 @@ function WaitingRoom() {
             toast.error('生成二维码失败')
         }
     }
-
+    const downloadQRCode = (qrCodeDataUrl: string) => {
+        // 创建一个临时链接
+        const link = document.createElement('a')
+        link.download = `room-${roomId}-qr.png`
+        link.href = qrCodeDataUrl
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
     // 处理图片上传和二维码识别
     const handleImageUpload = async (items: UploaderValueItem[]) => {
         try {
@@ -398,20 +420,7 @@ function WaitingRoom() {
         }
     }, [stopCamera])
 
-    // 修改房间二维码生成
-    const generateRoomQR = useCallback(async () => {
-        if (!room) return
-        const url = encodeRoomUrl(room.id)
-        try {
-            const qrDataUrl = await generateQRWithText(url, {
-                centerText: String(room.id)
-            })
-            setRoomQRCode(qrDataUrl)
-        } catch (error) {
-            console.error(error)
-            toast.error('生成房间二维码失败')
-        }
-    }, [room])
+
 
 
     const handleOrderSuccess = async () => {
@@ -434,6 +443,32 @@ function WaitingRoom() {
 
     return (
         <div className="max-w-2xl p-4 space-y-6">
+            <div className="">
+                <div className="w-full relative flex flex-col items-center">
+                    {roomQRCode && (
+                        <><Image
+                            src={roomQRCode}
+                            width={200}
+                            height={200}
+                            alt="Room QR Code"
+                            className="w-48 h-48 object-contain" />
+                            <div className='flex'>
+                                <Button type='primary' onClick={() => {
+                                    if (roomQRCode) {
+                                        downloadQRCode(roomQRCode)
+                                    }
+                                }}>保存</Button>
+                                <div className='w-2 px-2'></div>
+                                <Button
+                                    onClick={() => copyToClipboard(encodeRoomUrl(room.id))}
+                                >
+                                    复制地址
+                                </Button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
             <div className="bg-white rounded-lg p-4 space-y-3">
                 <div>二维码或者链接自生成后有效期限为30秒   失效请重新生成再次上传，切勿上传相同二维码或者链接</div>
                 <div>一旦发送成功就可以在后台查看验证情况  通过后进行下单即可。</div>
@@ -449,7 +484,7 @@ function WaitingRoom() {
                             }`}>
                             剩余时间: {countdown}
                         </span>}
-                        <Button
+                        {/* <Button
                             size="small"
                             icon={<Qr />}
                             onClick={() => {
@@ -458,7 +493,7 @@ function WaitingRoom() {
                             }}
                         >
                             房间码
-                        </Button>
+                        </Button> */}
                         {/* <span className="text-gray-500">
                             创建于 {formatDate(room.createdAt)}
                         </span> */}
