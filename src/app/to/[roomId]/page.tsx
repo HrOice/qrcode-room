@@ -84,7 +84,7 @@ function WaitingContent() {
                 setReveivedUrl(data)
                 if (data) {
                     setSendSuccess(true)
-                    if (dataCreatedAt!.getTime() + 30000 < new Date().getTime()) {
+                    if (dataCreatedAt!.getTime() + 25000 < new Date().getTime()) {
                         // 不显示打开链接
                         setDataExpired(true)
                         setSendSuccess(false)
@@ -139,7 +139,7 @@ function WaitingContent() {
             setReady(re)
             console.log('user ready1', ready, re)
             setNoticeSender(true)
-            setNoticeSenderTime(30)
+            setNoticeSenderTime(15)
             noticeSenderTimeRef.current = setInterval(() => {
                 setNoticeSenderTime((r) => {
                     return r -1;
@@ -148,7 +148,7 @@ function WaitingContent() {
             setTimeout(() => {
                 setNoticeSender(false)
                 clearInterval(noticeSenderTimeRef.current as NodeJS.Timeout)
-            }, 30000)
+            }, 15000)
         })
     }
 
@@ -203,6 +203,9 @@ function WaitingContent() {
                     {(
                         // 管理员已加入状态
                         <div className="space-y-4">
+                            <div>
+                                <div className='text-center'>点击按钮，提醒对方发送</div>
+                            </div>
                             {/* 二维码展示区域 */}
                             <div className="bg-white rounded-lg p-4">
                                 <div className="aspect-square w-full max-w-sm mx-auto rounded-lg flex items-center justify-center">
@@ -275,7 +278,10 @@ function WaitingContent() {
                                             <div className='text-center'>等待发送者发送...</div>
                                         </div>
                                     )}
+
                                 </div>
+                                <div>成功:截图反馈即可</div>
+                                <div>失败:重新扫描房间码进入房间，提醒对方发送</div>
                             </div>
 
                             {/* 准备状态区域 */}

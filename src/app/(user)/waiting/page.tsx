@@ -175,6 +175,7 @@ function WaitingRoom() {
                 () => {
                     setUserReady(true)
                     playNotifySound()
+                    toast.success('用户提醒你发送')
                 },
                 () => {
                     toast.success('用户已离开房间')
@@ -201,7 +202,11 @@ function WaitingRoom() {
                     }
                     setReceiverCallback('')
                     setIsReady(false)
-                    if (dataCreatedAt!.getTime() + 30000 < new Date().getTime()) {
+
+                    if (!dataCreatedAt) {
+                        return;
+                    }
+                    if (dataCreatedAt!.getTime() + 25000 < new Date().getTime()) {
                         // 不显示打开链接
                         setSendSuccess(false)
                         setTextValue('')
@@ -211,7 +216,7 @@ function WaitingRoom() {
                             setTextValue('')
                             setIsReady(true)
                             setUserReady(true)
-                        }, (dataCreatedAt!.getTime() + 30000) - new Date().getTime())
+                        }, (dataCreatedAt!.getTime() + 25000) - new Date().getTime())
                     }
                 }, (param) => {
                     const { online, ready } = param
@@ -442,7 +447,7 @@ function WaitingRoom() {
     }
 
     return (
-        <div className="max-w-2xl p-4 space-y-6">
+        <div className="max-w-2xl px-4 space-y-6">
             <div className="">
                 <div className="w-full relative flex flex-col items-center">
                     {roomQRCode && (
@@ -452,38 +457,40 @@ function WaitingRoom() {
                             height={200}
                             alt="Room QR Code"
                             className="w-48 h-48 object-contain" />
-                            <div className='flex'>
+                            <div className='flex items-center content-center'>
+                                <div className='px-4'>保存房间二维码发送给客服</div>
                                 <Button type='primary' onClick={() => {
                                     if (roomQRCode) {
                                         downloadQRCode(roomQRCode)
                                     }
-                                }}>保存</Button>
+                                }} > 保存 </Button>
                                 <div className='w-2 px-2'></div>
-                                <Button
+                                {/* <Button
                                     onClick={() => copyToClipboard(encodeRoomUrl(room.id))}
                                 >
                                     复制地址
-                                </Button>
+                                </Button> */}
                             </div>
                         </>
                     )}
                 </div>
             </div>
-            <div className="bg-white rounded-lg p-4 space-y-3">
-                <div>二维码或者链接自生成后有效期限为30秒   失效请重新生成再次上传，切勿上传相同二维码或者链接</div>
+            <div className="bg-white rounded-lg px-4 space-y-3">
+                <span className='text-2xl font-bold'>⚠️注意：</span>
+                <div>二维码或者链接自生成后有效期限为25秒   失效请重新生成再次上传，切勿上传相同二维码或者链接</div>
                 <div>一旦发送成功就可以在后台查看验证情况  通过后进行下单即可。</div>
                 <div className='text-red-600'>中途切记不要离开网页 避免掉线</div>
             </div>
             {/* 房间信息 */}
-            <div className="bg-white rounded-lg p-4 space-y-3">
-                <div className="flex justify-between items-center">
+            <div className="bg-white rounded-lg px-4 py-1 space-y-3">
+                {/* <div className="flex justify-between items-center">
                     <h2 className="text-lg font-medium">房间 #{room.id}</h2>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2"> */}
                         {/* 添加倒计时显示 */}
-                        {!reconnect && <span className={`text-sm ${countdown === '已超时' ? 'text-red-600' : 'text-gray-600'
+                        {/* {!reconnect && <span className={`text-sm ${countdown === '已超时' ? 'text-red-600' : 'text-gray-600'
                             }`}>
                             剩余时间: {countdown}
-                        </span>}
+                        </span>} */}
                         {/* <Button
                             size="small"
                             icon={<Qr />}
@@ -497,17 +504,17 @@ function WaitingRoom() {
                         {/* <span className="text-gray-500">
                             创建于 {formatDate(room.createdAt)}
                         </span> */}
-                    </div>
-                </div>
-                <div className="space-y-2">
+                    {/* </div> */}
+                {/* </div> */}
+                {/* <div className="space-y-2">
                     <div className="text-sm text-gray-500">CDKey</div>
                     <div className="font-mono bg-gray-50 p-2 rounded">
                         {room.cdkey.key}
                     </div>
-                </div>
-                <div className="text-sm text-gray-600">
+                </div> */}
+                {/* <div className="text-sm text-gray-600">
                     剩余使用次数: {room.cdkey.total - usedCount}/{room.cdkey.total}
-                </div>
+                </div> */}
                 {sendSuccess && <div className="text-sm text-red-600">
                     接收者反馈状态: {receiverCallback}
                 </div>}

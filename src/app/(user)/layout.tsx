@@ -13,7 +13,7 @@ export default function UserLayout({
             margin: '0 auto',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'center',
+            // justifyContent: 'center',
             // alignItems: 'center',
             padding: '2px',
             boxSizing: 'border-box'

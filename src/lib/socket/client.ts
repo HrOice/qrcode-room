@@ -208,7 +208,7 @@ export class RoomSocket {
             const { roomId, ready, online, roomCreatedAt, roomExpired, data, dataCreatedAt } = response
             this.roomId = roomId
             console.log('sender join room', response)
-            onJoinRoom(this.roomId!, ready, online, roomCreatedAt, roomExpired, data, new Date(dataCreatedAt))
+            onJoinRoom(this.roomId!, ready, online, roomCreatedAt, roomExpired, data, dataCreatedAt ? new Date(dataCreatedAt) : undefined)
             this.startHeartbeat()
         })
         this.socket.on('receiver-join', onUserJoin)
