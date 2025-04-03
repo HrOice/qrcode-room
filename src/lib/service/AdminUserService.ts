@@ -57,6 +57,8 @@ export async function AddUser(username: string, password: string) {
             username,
             password,
             status: 1,
+            createdAt: new Date(),
+            updatedAt: new Date(),
         },
     });
     return user;

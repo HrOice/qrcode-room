@@ -24,34 +24,37 @@ export default function Login() {
         }
     }
     return (
-        <div className="p-1 w-auto">
-            <Form
-                form={form}
-                onFinish={handleSubmit}
-                layout="horizontal"
-                footer={
-                    <Button
-                        block
-                        type="primary"
-                        size="large"
-                        loading={loading}
-                        onClick={() => form.submit()}
-                    >
-                        验证
-                    </Button>
-                }
-            >
-                <Form.Item
-                    label="卡密"
-                    name="password"
-                    rules={[{ required: true, message: '请输入卡密' }]}
+        <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
+            <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md">
+                <h2 className="text-2xl font-bold text-center mb-6">登录验证</h2>
+                <Form
+                    form={form}
+                    onFinish={handleSubmit}
+                    layout="horizontal"
+                    footer={
+                        <Button
+                            block
+                            type="primary"
+                            size="large"
+                            loading={loading}
+                            onClick={() => form.submit()}
+                        >
+                            验证
+                        </Button>
+                    }
                 >
-                    <Input
-                        placeholder="请输入卡密"
-                        clearable
-                    />
-                </Form.Item>
-            </Form>
+                    <Form.Item
+                        label="卡密"
+                        name="password"
+                        rules={[{ required: true, message: '请输入卡密' }]}
+                    >
+                        <Input
+                            placeholder="请输入卡密"
+                            clearable
+                        />
+                    </Form.Item>
+                </Form>
+            </div>
         </div>
     )
 }

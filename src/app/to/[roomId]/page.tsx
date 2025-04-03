@@ -204,11 +204,11 @@ function WaitingContent() {
                         // 管理员已加入状态
                         <div className="space-y-4">
                             <div>
-                                <div className='text-center'>点击按钮，提醒对方发送</div>
+                                <div className='text-center text-red-500'>点击按钮，提醒对方发送</div>
                             </div>
                             {/* 二维码展示区域 */}
-                            <div className="bg-white rounded-lg p-4">
-                                <div className="aspect-square w-full max-w-sm mx-auto rounded-lg flex items-center justify-center">
+                            <div className="bg-white rounded-lg px-4">
+                                <div className="p-4 w-full max-w-sm mx-auto rounded-lg flex items-center justify-center">
                                     {(!adminReady) && (!reveivedUrl) ? (
                                         <div className="text-gray-400">
                                             <span>请在此页面等待0-2分钟  中途不要离开网页  避免掉线</span>

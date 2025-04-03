@@ -55,7 +55,9 @@ export async function createRoom(ip: string, cdkeyId: number) {
         data: {
             ip,
             cdkeyId,
-            lastActive: new Date()
+            lastActive: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date()
         }
     });
     return room;
@@ -132,7 +134,9 @@ export async function checkRoomOrCreate(ip: string, cdkeyId: number, socketId: s
                 ip,
                 cdkeyId,
                 lastActive: new Date(),
-                socketId
+                socketId,
+                createdAt: new Date(),
+                updatedAt: new Date()
             }
         })
     } else {
@@ -163,6 +167,8 @@ export async function senderCheckRoomOrCreate(id: number, ip: string, cdkeyId: n
                 cdkeyId,
                 lastActive: new Date(),
                 adminSocketId,
+                createdAt: new Date(),
+                updatedAt: new Date()
             }
         })
     } else {
@@ -184,8 +190,8 @@ export async function senderCheckRoomOrCreate(id: number, ip: string, cdkeyId: n
  */
 export async function findRoom(id: number) {
     return await prisma.room.findUnique({
-        where: {id},
-        include: {cdkey: true}
+        where: { id },
+        include: { cdkey: true }
     })
 }
 

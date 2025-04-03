@@ -9,8 +9,8 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model CDKey {
@@ -19,8 +19,8 @@ model CDKey {
   used      Int           @default(0)
   total     Int           @default(1)
   status    Int           @default(0) // 默认可使用1，0禁用
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  createdAt DateTime      
+  updatedAt DateTime      
   records   CDKeyRecord[] // 关联字段
   Room      Room[]
 }
@@ -34,7 +34,7 @@ model CDKeyRecord {
   adminId   Int? // 管理员ID，分配时填写
   status    Int      @default(0) // 0: 待分配, 1: 已分配, 2: 已完成
 
-  @@index([cdkeyId])
+ //  @@index([cdkeyId])
 }
 
 model User {
@@ -43,10 +43,10 @@ model User {
   password  String
   role      Int      @default(1) // 0 超级管理员 1 普通管理员
   status    Int      @default(1) // 添加状态字段 1 启用 0 禁用
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime 
+  updatedAt DateTime 
 
-  @@unique([username])
+  // @@unique([username])
 }
 
 model Room {
@@ -55,8 +55,8 @@ model Room {
   cdkeyId       Int
   cdkey         CDKey    @relation(fields: [cdkeyId], references: [id])
   adminId       Int? // 可空，未分配时为 null
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime 
+  updatedAt     DateTime 
   lastActive    DateTime // 最后活跃时间，用于检测断线
   status        Int      @default(0) // 0 等待admin 1 已连接 2 已准备
   socketId      String? // 保存当前连接的 socket id

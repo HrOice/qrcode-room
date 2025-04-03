@@ -18,7 +18,9 @@ async function main() {
             data: {
                 username: 'admin',
                 password: hashedPassword,
-                status: 1 // 启用状态
+                status: 1, // 启用状态,
+                createdAt: new Date(),
+                updatedAt: new Date(),
             }
         })
         console.log('Created admin user')

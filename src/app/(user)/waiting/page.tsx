@@ -475,12 +475,12 @@ function WaitingRoom() {
                     )}
                 </div>
             </div>
-            <div className="bg-white rounded-lg px-4 space-y-3">
+            {isReady &&(<div className="bg-white rounded-lg px-4 space-y-3">
                 <span className='text-2xl font-bold'>⚠️注意：</span>
                 <div>二维码或者链接自生成后有效期限为25秒   失效请重新生成再次上传，切勿上传相同二维码或者链接</div>
                 <div>一旦发送成功就可以在后台查看验证情况  通过后进行下单即可。</div>
                 <div className='text-red-600'>中途切记不要离开网页 避免掉线</div>
-            </div>
+            </div>)}
             {/* 房间信息 */}
             <div className="bg-white rounded-lg px-4 py-1 space-y-3">
                 {/* <div className="flex justify-between items-center">
