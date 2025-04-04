@@ -5,6 +5,7 @@ export function useNotifySound(options = {
     soundUrl: '/sounds/sounds.mp3'
 }) {
     const notifyAudioRef = useRef<HTMLAudioElement | null>(null)
+    const isLoadedRef = useRef(false)
 
     // 初始化音频
     useEffect(() => {
@@ -12,19 +13,28 @@ export function useNotifySound(options = {
         if (notifyAudioRef.current) {
             notifyAudioRef.current.volume = options.volume
             notifyAudioRef.current.preload = 'auto'
+            
+            // 监听加载完成事件
+            notifyAudioRef.current.addEventListener('loadeddata', () => {
+                isLoadedRef.current = true
+            })
         }
     }, [options.soundUrl, options.volume])
 
     // 添加用户交互检测
     useEffect(() => {
         const handleInteraction = () => {
-            if (notifyAudioRef.current) {
+            // 只在未加载时执行一次
+            if (notifyAudioRef.current && !isLoadedRef.current) {
                 notifyAudioRef.current.load()
             }
         }
 
-        document.addEventListener('click', handleInteraction)
-        document.addEventListener('touchstart', handleInteraction)
+        // 只在未加载时添加监听器
+        if (!isLoadedRef.current) {
+            document.addEventListener('click', handleInteraction)
+            document.addEventListener('touchstart', handleInteraction)
+        }
 
         return () => {
             document.removeEventListener('click', handleInteraction)
@@ -33,7 +43,13 @@ export function useNotifySound(options = {
     }, [])
 
     const playNotifySound = useCallback(() => {
-        if (!notifyAudioRef.current) return
+        if (!notifyAudioRef.current || !isLoadedRef.current) return
+
+        // 如果正在播放，先重置
+        if (!notifyAudioRef.current.paused) {
+            notifyAudioRef.current.currentTime = 0
+            return
+        }
 
         const playPromise = notifyAudioRef.current.play()
 

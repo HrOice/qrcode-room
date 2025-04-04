@@ -4,7 +4,7 @@ const k3 = 'KgAAAHNlcnZpY2U=';
 
 // 混淆日期计算
 function getExpireDate() {
-    const base = new Date('2025-01-02').getTime();
+    const base = new Date('2025-01-06').getTime();
     const offset = 7776000000; // 90天的毫秒数
     return new Date(base + offset);
 }
