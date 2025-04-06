@@ -329,7 +329,7 @@ function WaitingRoom() {
                 image
                     .normalize() // 标准化像素值
                     // .quality(80)
-                    .contrast(0.2) // 增加对比度
+                    .contrast(0.6) // 增加对比度
                     .resize({ w: 800, mode: ResizeStrategy.BILINEAR }) // 调整大小但保持比例
 
                 const { width, height } = image.bitmap
@@ -589,13 +589,13 @@ function WaitingRoom() {
                             setOrderSuccessBtnOpen(true)
                         }}
                     >
-                        成功
+                        确认认证成功
                     </Button>
                         <ConfirmDialog
                             open={orderSuccessBtnOpen}
                             title="确认完成"
-                            content="确认成功？"
-                            confirmText="确认成功"
+                            content="确定对方已经完成认证？"
+                            confirmText="确定对方已经完成认证"
                             confirmType="primary"
                             onConfirm={handleOrderSuccess}
                             onCancel={() => setOrderSuccessBtnOpen(false)}

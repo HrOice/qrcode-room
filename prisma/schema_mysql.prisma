@@ -1,0 +1,64 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model CDKey {
+  id        Int           @id @default(autoincrement())
+  key       String        @unique
+  used      Int           @default(0)
+  total     Int           @default(1)
+  status    Int           @default(0) // 默认可使用1，0禁用
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  records   CDKeyRecord[] // 关联字段
+  Room      Room[]
+}
+
+model CDKeyRecord {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  cdkey     CDKey    @relation(fields: [cdkeyId], references: [id])
+  cdkeyId   Int
+  ip        String
+  adminId   Int? // 管理员ID，分配时填写
+  status    Int      @default(0) // 0: 待分配, 1: 已分配, 2: 已完成
+
+  @@index([cdkeyId])
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String
+  password  String
+  role      Int      @default(1) // 0 超级管理员 1 普通管理员
+  status    Int      @default(1) // 添加状态字段 1 启用 0 禁用
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([username])
+}
+
+model Room {
+  id            Int      @id @default(autoincrement())
+  ip            String
+  cdkeyId       Int
+  cdkey         CDKey    @relation(fields: [cdkeyId], references: [id])
+  adminId       Int? // 可空，未分配时为 null
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastActive    DateTime // 最后活跃时间，用于检测断线
+  status        Int      @default(0) // 0 等待admin 1 已连接 2 已准备
+  socketId      String? // 保存当前连接的 socket id
+  adminSocketId String? // 保存 admin 的 socket id
+}

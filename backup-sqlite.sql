@@ -1,0 +1,56 @@
+-- 关闭外键约束（创建表时）
+PRAGMA foreign_keys = OFF;
+
+-- 创建 CDKey 表
+CREATE TABLE CDKey (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key TEXT NOT NULL UNIQUE,
+  used INTEGER NOT NULL DEFAULT 0,
+  total INTEGER NOT NULL DEFAULT 1,
+  createdAt DATETIME NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+  updatedAt DATETIME NOT NULL,
+  status INTEGER NOT NULL DEFAULT 0
+);
+
+-- 创建 CDKeyRecord 表
+CREATE TABLE CDKeyRecord (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  createdAt DATETIME NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+  cdkeyId INTEGER NOT NULL,
+  ip TEXT NOT NULL,
+  adminId INTEGER,
+  status INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (cdkeyId) REFERENCES CDKey(id) ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- 创建索引
+CREATE INDEX CDKeyRecord_cdkeyId_idx ON CDKeyRecord (cdkeyId);
+
+-- 创建 Room 表
+CREATE TABLE Room (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ip TEXT NOT NULL,
+  cdkeyId INTEGER NOT NULL,
+  adminId INTEGER,
+  createdAt DATETIME NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+  updatedAt DATETIME NOT NULL,
+  lastActive DATETIME NOT NULL,
+  status INTEGER NOT NULL DEFAULT 0,
+  socketId TEXT,
+  adminSocketId TEXT,
+  FOREIGN KEY (cdkeyId) REFERENCES CDKey(id) ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- 创建 User 表
+CREATE TABLE User (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  password TEXT NOT NULL,
+  createdAt DATETIME NOT NULL DEFAULT (STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+  updatedAt DATETIME NOT NULL,
+  role INTEGER NOT NULL DEFAULT 1,
+  status INTEGER NOT NULL DEFAULT 1
+);
+
+-- 启用外键约束
+PRAGMA foreign_keys = ON;

@@ -38,7 +38,7 @@ export default function ConfirmDialog({
                         <DialogTitle as="h3" className="text-base/7 font-medium text-white">
                             {title}
                         </DialogTitle>
-                        <p className="mt-2 text-sm/6 text-white/50">
+                        <p className="mt-2 text-sm/6 text-white">
                             {content}
                         </p>
                         <div className="mt-4 flex w-full flex-row-reverse">
