@@ -1,36 +1,22 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+npm i 安装环境
 
-## Getting Started
+npm run dev 进入开发模式
 
-First, run the development server:
+npm run build 进行打包构建
+之后运行npm run build:server进行应用体积优化
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+直接运行：进入.next/standalone中执行npm run start
+
+docker运行：
+打包好的应用在.next/standalone中
+进入standalone文件夹进行docker镜像构建，执行 docker build -t qrroom .
+
+构建完成后使用docker.sh中的脚本启动docker容器
+
+访问localhost:3000即可使用
+
+环境变量
+``` 
+DATABASE_URL="file:./prisma/dev.db" // 见prisma/schema.prisma
+ROOM_EXPIRED="1800000" // 房间超时时间半小时
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
