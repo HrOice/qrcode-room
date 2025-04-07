@@ -4,7 +4,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { useCDKey, validCDKey } from '../service/CDkeyService';
 // import { cleanUnactiveRoom } from '../service/RoomService';
 
-import { expireCheck } from '../utils/expire';
 import {
   adminJoinCreateRoom,
   adminJoinRoom,
@@ -133,9 +132,6 @@ export function createSocketServer(server: any) {
     const roomId = socket.handshake.auth.roomId
     if (!token) {
       return next(new Error('unauthorized'))
-    }
-    if (new Date().getTime() >= expireCheck.date.getTime()) {
-      return next(new Error(expireCheck.errorMessage.message))
     }
 
     try {
