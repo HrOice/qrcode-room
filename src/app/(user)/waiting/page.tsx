@@ -5,7 +5,6 @@ import { roomApi, RoomDetail } from '@/lib/api/room'
 import { RoomSocket } from '@/lib/socket/client'
 
 
-import { Jimp, ResizeStrategy } from 'jimp'
 import jsQR from 'jsqr'
 import QRCode from 'qrcode'
 
@@ -313,6 +312,18 @@ function WaitingRoom() {
         link.click()
         document.body.removeChild(link)
     }
+
+    function resizeImageToCanvas(img: HTMLImageElement, targetSize = 800): HTMLCanvasElement {
+        const scale = Math.min(targetSize / img.width, targetSize / img.height);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d')!;
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        return canvas;
+    }
+    
     // 处理图片上传和二维码识别
     const handleImageUpload = async (items: UploaderValueItem[]) => {
         try {
@@ -320,51 +331,71 @@ function WaitingRoom() {
                 setQrCodeData({
                     url: items[0].url!,
                     type: 'image'
-                })
-
-                // 使用 Jimp 处理图片
-                const image = await Jimp.read(items[0].url!)
-
-                // 可以添加图片预处理以提高识别率
-                image
-                    .normalize() // 标准化像素值
-                    // .quality(80)
-                    .contrast(0.6) // 增加对比度
-                    .resize({ w: 800, mode: ResizeStrategy.BILINEAR }) // 调整大小但保持比例
-
-                const { width, height } = image.bitmap
-                const imageData = new Uint8ClampedArray(image.bitmap.data)
-
-                // 使用增强的配置进行识别
-                const code = jsQR(imageData, width, height, {
-                    inversionAttempts: "dontInvert", // 尝试黑白两种模式
-
-                })
-
-                if (code) {
-                    // 识别成功后，使用文本重新生成小尺寸二维码
-                    const compressedQR = await QRCode.toDataURL(code.data, {
-                        width: 400,
-                        margin: 1,
-                        scale: 4,
-                        // quality: 0.8,
-                    })
-
-                    setTextValue(code.data)
-                    setQrCodeData({
-                        url: compressedQR,
-                        type: 'text'  // 改为text类型，这样发送时会使用文本重新生成
-                    })
-                    toast.success('已识别二维码内容')
-                } else {
-                    toast.error('未检测到二维码，请尝试调整图片亮度或对比度')
-                }
+                });
+    
+                const img = new window.Image();
+                img.crossOrigin = "Anonymous";
+                img.src = items[0].url!;
+    
+                img.onload = async () => {
+                    const tryDetectQR = (angle: number): string | null => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d')!;
+                        const maxSize = 1600;
+                        const scale = Math.min(maxSize / img.width, maxSize / img.height);
+                        const w = img.width * scale;
+                        const h = img.height * scale;
+    
+                        // 设置足够大的画布来容纳旋转后的图像
+                        canvas.width = w;
+                        canvas.height = h;
+    
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+                        // 将画布坐标系移动到中心，旋转，再绘图
+                        ctx.translate(w / 2, h / 2);
+                        ctx.rotate((angle * Math.PI) / 180);
+                        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    
+                        const imageData = ctx.getImageData(0, 0, w, h);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: "dontInvert"
+                        });
+    
+                        return code?.data ?? null;
+                    };
+    
+                    let qrText: string | null = null;
+    
+                    for (let angle = -10; angle <= 10; angle += 2) {
+                        qrText = tryDetectQR(angle);
+                        if (qrText) break;
+                    }
+    
+                    if (qrText) {
+                        const compressedQR = await QRCode.toDataURL(qrText, {
+                            width: 400,
+                            margin: 1,
+                            scale: 4,
+                        });
+    
+                        setTextValue(qrText);
+                        setQrCodeData({
+                            url: compressedQR,
+                            type: 'text'
+                        });
+                        toast.success('已识别二维码内容');
+                    } else {
+                        toast.error('未检测到二维码，请尝试调整图片亮度或对比度');
+                    }
+                };
             }
         } catch (error) {
-            console.error('识别二维码失败:', error)
-            toast.error('识别失败，请确保上传的是清晰的二维码图片')
+            console.error('识别二维码失败:', error);
+            toast.error('识别失败，请确保上传的是清晰的二维码图片');
         }
-    }
+    };
+    
 
     // 处理提交
     const handleSubmit = async () => {
