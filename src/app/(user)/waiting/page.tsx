@@ -269,15 +269,15 @@ function WaitingRoom() {
      */
     function extractAlipayLink(input: string): string | null {
         // 匹配以 https://ds.alipay.com/ 开头的链接
-        const regex = /https:\/\/ds\.alipay\.com\/[^\s]+/
-        const match = input.match(regex)
+        const regex = /https:\/\/ds\.alipay\.com\/[^\s]+/;
+        const match = input.match(regex);
 
         if (match && match[0]) {
-            // 如果链接末尾有中文或其他文字，去除
-            return match[0].replace(/[\u4e00-\u9fa5]+$/, '').trim()
+            // 按空格分隔并取第一个部分，去除尾部干扰信息
+            return match[0].split(' ')[0].trim();
         }
 
-        return null
+        return null;
     }
     // 修改文本变化处理函数
     const handleTextChange = async (text: string) => {
@@ -323,7 +323,7 @@ function WaitingRoom() {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         return canvas;
     }
-    
+
     // 处理图片上传和二维码识别
     const handleImageUpload = async (items: UploaderValueItem[]) => {
         try {
@@ -332,11 +332,11 @@ function WaitingRoom() {
                     url: items[0].url!,
                     type: 'image'
                 });
-    
+
                 const img = new window.Image();
                 img.crossOrigin = "Anonymous";
                 img.src = items[0].url!;
-    
+
                 img.onload = async () => {
                     const tryDetectQR = (angle: number): string | null => {
                         const canvas = document.createElement('canvas');
@@ -345,41 +345,41 @@ function WaitingRoom() {
                         const scale = Math.min(maxSize / img.width, maxSize / img.height);
                         const w = img.width * scale;
                         const h = img.height * scale;
-    
+
                         // 设置足够大的画布来容纳旋转后的图像
                         canvas.width = w;
                         canvas.height = h;
-    
+
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
                         // 将画布坐标系移动到中心，旋转，再绘图
                         ctx.translate(w / 2, h / 2);
                         ctx.rotate((angle * Math.PI) / 180);
                         ctx.drawImage(img, -w / 2, -h / 2, w, h);
-    
+
                         const imageData = ctx.getImageData(0, 0, w, h);
                         const code = jsQR(imageData.data, imageData.width, imageData.height, {
                             inversionAttempts: "dontInvert"
                         });
-    
+
                         return code?.data ?? null;
                     };
-    
+
                     let qrText: string | null = null;
-    
+
                     for (let angle = -10; angle <= 10; angle += 2) {
                         qrText = tryDetectQR(angle);
                         if (qrText) break;
                     }
-    
+
                     if (qrText) {
                         const compressedQR = await QRCode.toDataURL(qrText, {
                             width: 400,
                             margin: 1,
                             scale: 4,
                         });
-    
-                        setTextValue(qrText);
+                        qrText = extractAlipayLink(qrText)
+                        setTextValue(qrText!);
                         setQrCodeData({
                             url: compressedQR,
                             type: 'text'
@@ -395,7 +395,7 @@ function WaitingRoom() {
             toast.error('识别失败，请确保上传的是清晰的二维码图片');
         }
     };
-    
+
 
     // 处理提交
     const handleSubmit = async () => {
@@ -439,6 +439,8 @@ function WaitingRoom() {
 
     const { showCamera, videoRef, startCamera, stopCamera } = useQRScanner({
         onSuccess: async (text) => {
+            text = extractAlipayLink(text) || ""
+            console.log(text)
             setTextValue(text)
             // const qrDataUrl = await generateQR(text)
             setQrCodeData({
@@ -506,7 +508,7 @@ function WaitingRoom() {
                     )}
                 </div>
             </div>
-            {isReady &&(<div className="bg-white rounded-lg px-4 space-y-3">
+            {isReady && (<div className="bg-white rounded-lg px-4 space-y-3">
                 <span className='text-2xl font-bold'>⚠️注意：</span>
                 <div>二维码或者链接自生成后有效期限为25秒   失效请重新生成再次上传，切勿上传相同二维码或者链接</div>
                 <div>一旦发送成功就可以在后台查看验证情况  通过后进行下单即可。</div>
@@ -517,12 +519,12 @@ function WaitingRoom() {
                 {/* <div className="flex justify-between items-center">
                     <h2 className="text-lg font-medium">房间 #{room.id}</h2>
                     <div className="flex items-center gap-2"> */}
-                        {/* 添加倒计时显示 */}
-                        {/* {!reconnect && <span className={`text-sm ${countdown === '已超时' ? 'text-red-600' : 'text-gray-600'
+                {/* 添加倒计时显示 */}
+                {/* {!reconnect && <span className={`text-sm ${countdown === '已超时' ? 'text-red-600' : 'text-gray-600'
                             }`}>
                             剩余时间: {countdown}
                         </span>} */}
-                        {/* <Button
+                {/* <Button
                             size="small"
                             icon={<Qr />}
                             onClick={() => {
@@ -532,10 +534,10 @@ function WaitingRoom() {
                         >
                             房间码
                         </Button> */}
-                        {/* <span className="text-gray-500">
+                {/* <span className="text-gray-500">
                             创建于 {formatDate(room.createdAt)}
                         </span> */}
-                    {/* </div> */}
+                {/* </div> */}
                 {/* </div> */}
                 {/* <div className="space-y-2">
                     <div className="text-sm text-gray-500">CDKey</div>
@@ -552,6 +554,8 @@ function WaitingRoom() {
             </div>
             {/* 重连按钮 */}
             {reconnect && (
+                <>
+                <span className='py-4'>网络不佳，请点击重新连接</span>
                 <Button
                     block
                     type='primary'
@@ -561,6 +565,7 @@ function WaitingRoom() {
                 >
                     重新连接
                 </Button>
+                </>
             )}
 
             {/* 操作区域 */}
