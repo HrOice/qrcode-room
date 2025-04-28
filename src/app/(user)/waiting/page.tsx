@@ -615,7 +615,7 @@ function WaitingRoom() {
                         disabled={!textValue || !userOnline}
                         onClick={handleSubmit}
                     >
-                        发送给用户
+                        发送给学生
                     </Button>
                     {sendSuccess && (<><Button
                         block

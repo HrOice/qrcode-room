@@ -2,9 +2,12 @@
 
 import { cdkeyApi, type CDKey } from '@/lib/api/cdkey'
 import { copyToClipboard } from '@/lib/utils/clipboard'
+import { encodeRoomUrl, generateQRWithText } from '@/lib/utils/qrcode'
+import { Dialog as DialogHeadless, DialogPanel, DialogTitle } from '@headlessui/react'
 import { Search } from '@react-vant/icons'
 import { format } from 'date-fns'
-import { useCallback, useEffect, useState } from 'react'
+import Image from 'next/image'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Button, Cell, Dialog, Input, Pagination, Popup } from 'react-vant'
 
@@ -24,7 +27,33 @@ export default function CDKeyPage() {
     })
     const [lastCreatedKeys, setLastCreatedKeys] = useState<CDKey[]>([])
     const [showCreatedDialog, setShowCreatedDialog] = useState(false)
+    const [showRoomQR, setShowRoomQR] = useState(false)
+    const [roomQRCode, setRoomQRCode] = useState('')
+    const roomId = useRef(0);
+    // 修改房间二维码生成
+    const generateRoomQR = useCallback(async (roomId: number) => {
+        if (!roomId) return
+        const url = encodeRoomUrl(roomId)
+        try {
+            const qrDataUrl = await generateQRWithText(url, {
+                centerText: String(roomId)
+            })
+            setRoomQRCode(qrDataUrl)
+        } catch (error) {
+            console.error(error)
+            toast.error('生成房间二维码失败')
+        }
+    }, [])
 
+    const downloadQRCode = (qrCodeDataUrl: string) => {
+        // 创建一个临时链接
+        const link = document.createElement('a')
+        link.download = `room-${roomId.current}-qr.png`
+        link.href = qrCodeDataUrl
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
     // 获取列表
     const fetchCDKeys = useCallback(async () => {
         setLoading(true)
@@ -128,6 +157,16 @@ export default function CDKeyPage() {
                                     >
                                         复制
                                     </Button>
+                                    <Button
+                                        size="mini"
+                                        onClick={async () => {
+                                            roomId.current = cdkey.id
+                                            await generateRoomQR(cdkey.id)
+                                            setShowRoomQR(true)
+                                        }}
+                                    >
+                                        房间码
+                                    </Button>
                                 </div>
 
                                 {/* 在小屏幕下显示的信息 */}
@@ -136,8 +175,8 @@ export default function CDKeyPage() {
                                     <div>
                                         状态:
                                         <span className={`ml-1 px-2 py-1 rounded ${cdkey.status
-                                                ? 'bg-green-50 text-green-600'
-                                                : 'bg-red-50 text-red-600'
+                                            ? 'bg-green-50 text-green-600'
+                                            : 'bg-red-50 text-red-600'
                                             }`}>
                                             {cdkey.status ? '可用' : '失效'}
                                         </span>
@@ -151,8 +190,8 @@ export default function CDKeyPage() {
                                 </div>
                                 <div className="hidden lg:block">
                                     <span className={`px-2 py-1 rounded text-sm ${cdkey.status
-                                            ? 'bg-green-50 text-green-600'
-                                            : 'bg-red-50 text-red-600'
+                                        ? 'bg-green-50 text-green-600'
+                                        : 'bg-red-50 text-red-600'
                                         }`}>
                                         {cdkey.status ? '可用' : '失效'}
                                     </span>
@@ -354,6 +393,54 @@ export default function CDKeyPage() {
                     </div>
                 </div>
             </Dialog>
+            {/* 在最后添加房间二维码对话框 */}
+            <DialogHeadless
+                open={showRoomQR}
+                onClose={() => setShowRoomQR(false)}
+                className="relative z-50"
+            >
+                <div className="fixed inset-0 bg-black/30" />
+                <div className="fixed inset-0 flex items-center justify-center p-4">
+                    <DialogPanel className="w-full max-w-sm rounded-lg bg-white">
+                        <div className="p-4">
+                            <DialogTitle className="text-lg font-medium">房间二维码 #{roomId.current}</DialogTitle>
+                            <div className="mt-4 aspect-square w-full relative flex flex-col items-center">
+                                {roomQRCode && (
+                                    <Image
+                                        src={roomQRCode}
+                                        width={200}
+                                        height={200}
+                                        alt="Room QR Code"
+                                        className="w-48 h-48 object-contain"
+                                    />
+                                )}
+                                <div className="mt-4 flex items-center gap-2 px-4">
+                                    {/* <div className="text-sm text-gray-500 break-all flex-1">
+                                                    {`${window.location.origin}/to/${room.id}`}
+                                                </div> */}
+                                    <Button
+                                        size="small"
+                                        onClick={() => {
+                                            debugger
+                                            copyToClipboard(encodeRoomUrl(roomId.current))
+                                        }}
+                                    >
+                                        复制地址
+                                    </Button>
+                                    <Button type='primary' onClick={() => {
+                                        if (roomQRCode) {
+                                            downloadQRCode(roomQRCode)
+                                        }
+                                    }} > 保存 </Button>
+                                </div>
+                            </div>
+                            <div className="mt-4 flex justify-end">
+                                <Button onClick={() => setShowRoomQR(false)}>关闭</Button>
+                            </div>
+                        </div>
+                    </DialogPanel>
+                </div>
+            </DialogHeadless>
         </div>
     )
 }
