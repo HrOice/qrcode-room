@@ -645,7 +645,7 @@ function WaitingRoom() {
                     <div className="flex justify-between items-center">
                         <div className="space-y-2">
                             <div>
-                                对方是否在线:
+                                学生是否在线:
                                 <span className={`ml-2 ${userOnline ? 'text-green-600' : 'text-red-600'}`}>
                                     {userOnline ? '在线' : '离线'}
                                 </span>
